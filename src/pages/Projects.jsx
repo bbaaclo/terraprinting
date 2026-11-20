@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PageShell, { Segmented, Select, StatusPill } from './PageShell.jsx';
 import { STAGES, WAITING_REASONS } from '../lib/sampleData.js';
 import { daysUntil, formatDate, paidAmount, peso, todayIso, uid, update, useData } from '../lib/store.js';
@@ -104,6 +104,22 @@ export default function Projects() {
   const [editing, setEditing] = useState(null);
   const [pickup, setPickup] = useState(null); // project id
   const [pickName, setPickName] = useState('');
+  const pickupRef = useRef(null);
+  const formRef = useRef(null);
+
+  // When the pickup check or the project form opens, bring it into view and
+  // put the cursor in its first field, so it isn't missed further up the page.
+  useEffect(() => {
+    if (!pickup || !pickupRef.current) return;
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    pickupRef.current.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
+    pickupRef.current.querySelector('input')?.focus({ preventScroll: true });
+  }, [pickup]);
+  useEffect(() => {
+    if (!editing || !formRef.current) return;
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    formRef.current.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+  }, [editing?.id]);
 
   const name = (p) => data.customers.find((c) => c.id === p.customerId)?.name ?? 'Customer';
   const all = data.projects;
@@ -140,7 +156,9 @@ export default function Projects() {
         <div className="tile card"><span>Balance to collect</span><strong className="text-danger">{peso(balanceTotal)}</strong><small>{notPaid} {notPaid === 1 ? 'project' : 'projects'} not fully paid</small></div>
       </div>
 
-      {editing && <ProjectForm key={editing.id} data={data} initial={editing} onClose={() => setEditing(null)} />}
+      <div ref={formRef} className="scroll-anchor">
+        {editing && <ProjectForm key={editing.id} data={data} initial={editing} onClose={() => setEditing(null)} />}
+      </div>
 
       <section className="card card-pad top-gap" aria-labelledby="plist-title">
         <div className="card-head">
@@ -153,7 +171,7 @@ export default function Projects() {
         </div>
 
         {pp && (
-          <div className={`pickup-box${ppBalance > 0 ? ' warn' : ''}`} role="alertdialog" aria-labelledby="pickup-title">
+          <div ref={pickupRef} className={`pickup-box${ppBalance > 0 ? ' warn' : ''}`} role="alertdialog" aria-labelledby="pickup-title">
             <h3 id="pickup-title">{ppBalance > 0 ? `Balance of ${peso(ppBalance)} is still due` : `Release ${pp.garment}`}</h3>
             <p>
               {ppBalance > 0
