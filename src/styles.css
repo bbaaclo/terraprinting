@@ -1025,3 +1025,6 @@ a.btn { text-decoration: none; }
 .projects-table .stage-cell { min-width: 170px; }
 .projects-table .stage-name { margin-top: 6px; }
 .projects-table .select-wrap.compact { min-width: 136px; }
+
+/* Keep scrolled-to panels clear of the sticky header. */
+.pickup-box, .scroll-anchor { scroll-margin-top: 96px; }
