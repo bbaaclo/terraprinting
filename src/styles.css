@@ -974,17 +974,6 @@ a.btn { text-decoration: none; }
 .data-box { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
 .data-box-text p { margin: 4px 0 0; }
 
-/* The header ribbon gets a slow shine. */
-.ribbon { position: relative; }
-.ribbon::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  width: 160px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0));
-  animation: ribbon-shine 6s ease-in-out infinite;
-}
-@keyframes ribbon-shine { 0% { transform: translateX(-200px); } 60%, 100% { transform: translateX(110vw); } }
 
 @media (max-width: 960px) {
   .hero { grid-template-columns: 1fr; padding: 28px 22px; }
@@ -994,7 +983,7 @@ a.btn { text-decoration: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero::before, .jersey-stack, .layer, .plate, .layer-tag, .stack-shadow, .print-scan::before, .ribbon::after,
+  .hero::before, .jersey-stack, .layer, .plate, .layer-tag, .stack-shadow, .print-scan::before,
   .hero-greeting, .hero-title, .hero .page-lede, .hero .row-actions, .hero-stats, .hero-next, .feature-card, .pulse-dot::after { animation: none !important; }
   .plate, .layer-tag { opacity: 0; }
 }
