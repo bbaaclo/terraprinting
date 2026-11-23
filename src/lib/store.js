@@ -2,7 +2,7 @@
 // saved in this browser on this computer (localStorage). Nothing is sent
 // anywhere. Use Export backup on the Home screen to keep a copy.
 import { useSyncExternalStore } from 'react';
-import { emptyData, sampleData } from './sampleData.js';
+import { emptyData, sampleData, samplePatternSizes } from './sampleData.js';
 
 // v2: sample names changed to clearly made-up ones, so every browser
 // (including yours) starts again from the new sample data.
@@ -13,7 +13,12 @@ let state = load();
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      // Data saved before the size generator existed gets the default presets.
+      if (!saved.patternSizes) saved.patternSizes = samplePatternSizes();
+      return saved;
+    }
   } catch {
     /* fall through to sample data */
   }
@@ -39,13 +44,13 @@ export function update(change) {
 }
 
 export function replaceAll(data) {
-  state = data;
+  state = data.patternSizes ? data : { ...data, patternSizes: samplePatternSizes() };
   save();
   listeners.forEach((l) => l());
 }
 
 // Keeps the size charts (they may have been edited); clears the rest.
-export const removeSampleData = () => replaceAll({ ...emptyData(), charts: state.charts });
+export const removeSampleData = () => replaceAll({ ...emptyData(), charts: state.charts, patternSizes: state.patternSizes });
 
 export function useData() {
   return useSyncExternalStore(

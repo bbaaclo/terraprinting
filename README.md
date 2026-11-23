@@ -55,7 +55,8 @@ writes a browser version into `src/vendor/vtracer/` (not committed).
 
 - **Home** (`#/`): Design to SVG, Customer Sizes and Projects.
 - **Design to SVG** (`#/svg`): the image-to-layered-SVG tool.
-- **Customer Sizes**: size chart and size finder (`#/sizes`), team orders with
+- **Customer Sizes**: generate every size from one pattern (preset width and
+  height per size, downloads as SVG or ZIP), body measurements and size finder (`#/sizes`), team orders with
   CSV import/export (`#/orders`), previous customers (`#/customers`).
 - **Projects** (`#/projects`): stages, due dates, payment status, pickup check.
 

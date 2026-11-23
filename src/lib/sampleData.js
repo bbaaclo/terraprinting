@@ -13,6 +13,20 @@ const SAMPLE_CHART = {
   Child: [['4', 58, 53, 27, 44, 27], ['6', 62, 55, 28, 48, 29], ['8', 66, 58, 29, 52, 31], ['10', 70, 61, 30, 56, 33], ['12', 75, 64, 31, 60, 35], ['14', 80, 67, 32, 63, 37], ['16', 84, 70, 33, 66, 39]],
 };
 
+// Default flat width and height (cm) of each size, used to generate every
+// size from one pattern. Staff can change them on the Size chart page.
+const SAMPLE_PATTERN_SIZES = {
+  Men: [['XS', 48, 68], ['S', 51, 70], ['M', 54, 72], ['L', 57, 74], ['XL', 60, 76], ['2XL', 63, 78], ['3XL', 66, 80]],
+  Women: [['XS', 43, 62], ['S', 46, 64], ['M', 49, 66], ['L', 52, 68], ['XL', 55, 70], ['2XL', 58, 72], ['3XL', 61, 74]],
+  Child: [['4', 33, 44], ['6', 35, 48], ['8', 37, 52], ['10', 39, 56], ['12', 41, 60], ['14', 43, 63], ['16', 45, 66]],
+};
+
+export function samplePatternSizes() {
+  const out = {};
+  for (const g of GARMENTS) out[g] = structuredClone(SAMPLE_PATTERN_SIZES);
+  return out;
+}
+
 export function sampleCharts() {
   const charts = {};
   for (const g of GARMENTS) charts[g] = structuredClone(SAMPLE_CHART);
@@ -67,9 +81,9 @@ export function sampleData() {
     { id: 'p10', customerId: 'c4', garment: 'Basketball jersey', pieces: 60, price: 48000, status: 'completed', due: '2026-05-30', owner: 'Mark', pay: 'partial', pickedUp: '2026-05-30', pickedBy: 'Mr. Joel Santos', file: 'riverside-league-2026.svg' },
     { id: 'p11', customerId: 'c8', garment: 'Softball jersey', pieces: 15, price: 11250, status: 'ongoing', stage: 4, due: '2026-11-21', owner: 'Ana', pay: 'partial' },
   ];
-  return { version: 1, sample: true, customers, orders, projects, charts: sampleCharts() };
+  return { version: 1, sample: true, customers, orders, projects, charts: sampleCharts(), patternSizes: samplePatternSizes() };
 }
 
 export function emptyData() {
-  return { version: 1, sample: false, customers: [], orders: [], projects: [], charts: sampleCharts() };
+  return { version: 1, sample: false, customers: [], orders: [], projects: [], charts: sampleCharts(), patternSizes: samplePatternSizes() };
 }

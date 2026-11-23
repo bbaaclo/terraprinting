@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import PageShell, { Segmented, Select, SizesNav } from './PageShell.jsx';
+import PatternGenerator from './PatternGenerator.jsx';
 import { GARMENTS, GROUPS, sampleCharts } from '../lib/sampleData.js';
 import { formatDate, update, useData } from '../lib/store.js';
 
@@ -63,15 +64,31 @@ export default function SizeChart() {
   return (
     <PageShell title="Customer Sizes">
       <SizesNav current="sizes" />
+
+      <div className="row-actions between top-gap">
+        <div>
+          <h1 className="page-title small">Size chart</h1>
+          <p className="hint">Generate every size from one pattern, and keep the body measurements for each size.</p>
+        </div>
+        <div className="row-actions">
+          <label htmlFor="garment" className="field-label-inline">Garment</label>
+          <Select id="garment" value={garment} onChange={(e) => { setGarment(e.target.value); setEditing(null); setResult(null); }}>
+            {GARMENTS.map((g) => <option key={g}>{g}</option>)}
+          </Select>
+          <Segmented label="Who the sizes are for" options={GROUPS.map((g) => ({ value: g, label: g }))} value={group} onChange={(g) => { setGroup(g); setEditing(null); setResult(null); }} />
+          <Segmented label="Units" options={[{ value: 'cm', label: 'cm' }, { value: 'in', label: 'in' }]} value={unit} onChange={(u) => { setUnit(u); setEditing(null); setResult(null); setAdded(''); }} />
+        </div>
+      </div>
+
+      <div className="top-gap">
+        <PatternGenerator garment={garment} group={group} unit={unit} />
+      </div>
+
       <div className="split">
         <section className="card card-pad split-main" aria-labelledby="chart-title">
           <div className="card-head">
-            <h1 id="chart-title" className="card-title">Size chart</h1>
+            <h2 id="chart-title" className="card-title small">Body measurements</h2>
             <div className="row-actions">
-              <label htmlFor="garment" className="field-label-inline">Garment</label>
-              <Select id="garment" value={garment} onChange={(e) => { setGarment(e.target.value); setEditing(null); setResult(null); }}>
-                {GARMENTS.map((g) => <option key={g}>{g}</option>)}
-              </Select>
               {editing ? (
                 <>
                   <button type="button" className="btn btn-primary" onClick={save}>Save chart</button>
@@ -83,13 +100,9 @@ export default function SizeChart() {
             </div>
           </div>
 
-          <div className="row-actions between top-gap">
-            <Segmented label="Who the sizes are for" options={GROUPS.map((g) => ({ value: g, label: g }))} value={group} onChange={(g) => { setGroup(g); setEditing(null); setResult(null); }} />
-            {!editing && <Segmented label="Units" options={[{ value: 'cm', label: 'cm' }, { value: 'in', label: 'in' }]} value={unit} onChange={(u) => { setUnit(u); setResult(null); setAdded(''); }} />}
-          </div>
           <p className="hint">
             {group === 'Child' ? 'Kids’ sizes, by age.' : `Adult sizes, ${group === 'Men' ? 'men’s' : 'women’s'} cut.`}{' '}
-            {editing ? 'Editing in cm.' : `Measurements in ${unit === 'cm' ? 'cm' : 'inches'}.`}
+            {editing ? 'Editing in cm.' : `Body measurements in ${unit === 'cm' ? 'cm' : 'inches'}, used by the size finder.`}
             {data.sample || JSON.stringify(rows) === JSON.stringify(sampleCharts()[garment][group]) ? ' These are sample values. Replace them with your shop’s chart in Edit chart.' : ''}
           </p>
 

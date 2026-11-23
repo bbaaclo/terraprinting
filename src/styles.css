@@ -1017,3 +1017,35 @@ a.btn { text-decoration: none; }
 
 /* Keep scrolled-to panels clear of the sticky header. */
 .pickup-box, .scroll-anchor { scroll-margin-top: 96px; }
+
+/* =========================================================
+   Size chart: generate sizes from one pattern
+   ========================================================= */
+.steps { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 14px 0 0; padding: 0; list-style: none; font-size: 14px; font-weight: 600; }
+.steps li { display: flex; align-items: center; gap: 10px; }
+.step-badge { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--blue); color: var(--blue); font-size: 13px; font-weight: 700; box-sizing: border-box; }
+.step-badge.done { background: var(--blue); color: #fff; }
+.gen-split { margin-top: 18px; }
+.gen-step { min-width: 0; }
+.gen-step .mini-title { margin: 0; font-size: 16px; }
+.pattern-drop {
+  display: grid; justify-items: center; gap: 4px; margin-top: 12px; padding: 18px;
+  border: 2px dashed var(--line-strong); border-radius: var(--radius-md); background: #fafbfc; text-align: center;
+}
+.pattern-drop.is-dragging { border-color: var(--blue); border-style: solid; background: var(--blue-wash); }
+.pattern-preview { width: 140px; height: 160px; object-fit: contain; }
+.pattern-name { font-size: 14px; word-break: break-all; }
+.edit-table tr.is-base { background: var(--blue-wash); }
+.edit-table tr.is-off { opacity: 0.5; }
+.check { width: 20px; height: 20px; accent-color: var(--blue); cursor: pointer; }
+.unit-input { display: inline-flex; align-items: center; gap: 6px; }
+.cell-input.box { border-color: var(--line-strong); background: var(--surface); }
+.cell-input.num-input { width: 76px; text-align: right; font-variant-numeric: tabular-nums; }
+.gen-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; margin-top: 18px; }
+.gen-card { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 12px 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: #fafbfc; }
+.gen-card .btn { margin-top: 10px; }
+.thumb-box { display: flex; align-items: flex-end; justify-content: center; width: 126px; height: 150px; }
+.thumb-box img { display: block; }
+.gen-size { margin-top: 8px; font-size: 20px; font-weight: 800; }
+.gen-note { margin-top: 16px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--orange-wash); color: #7a3b0c; font-size: 13px; line-height: 1.45; }
+.gen-empty { margin-top: 18px; padding: 28px; border: 2px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--muted); font-size: 14px; }

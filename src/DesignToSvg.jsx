@@ -7,6 +7,8 @@ import { finalizeSvg } from './lib/svgOutput.js';
 import { DEFAULT_ADJUST, DEFAULT_TRACE_SETTINGS, buildTraceSettings } from './lib/traceSettings.js';
 import { applyMask, getAiMask } from './lib/aiBackground.js';
 import { upscaleIfSmall } from './lib/upscale.js';
+import { setLastDesign } from './lib/lastDesign.js';
+import { svgFileName } from './lib/svgOutput.js';
 import { findWords } from './lib/ocr.js';
 import { buildLayeredSvg, classify, readPaths } from './lib/layers.js';
 
@@ -153,6 +155,9 @@ export default function DesignToSvg() {
       setOpening(false);
     }
   }, [runTrace, removeBg, bgMethod, adjust]);
+
+  // Remember the latest layered SVG so the Size chart can use it as a pattern.
+  useEffect(() => { if (trace.svg && image) setLastDesign({ name: svgFileName(image.name), svg: trace.svg }); }, [trace.svg, image]);
 
   // Free the previous preview image when a new one replaces it.
   useEffect(() => () => { if (image) URL.revokeObjectURL(image.url); }, [image]);
