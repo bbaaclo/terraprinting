@@ -1160,3 +1160,4 @@ a.btn { text-decoration: none; }
   .tile-grid { grid-template-columns: minmax(0, 1fr); }
   .info-row { grid-template-columns: minmax(0, 1fr); }
 }
+.pieces-actions { display: flex; flex-wrap: wrap; gap: 8px; }

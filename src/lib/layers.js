@@ -138,7 +138,7 @@ export function buildLayeredSvg({ paths, viewWidth, viewHeight }, assign, width,
 // ends up as 1 to 3 shapes.
 const MAX_COLORS_PER_LAYER = 3;
 
-function layerColorMap(layerPaths) {
+export function layerColorMap(layerPaths) {
   const byColor = {};
   for (const p of layerPaths) byColor[p.fill] = (byColor[p.fill] || 0) + p.area;
   const ranked = Object.entries(byColor).sort((a, b) => b[1] - a[1]).map(([hex]) => hex);
@@ -152,7 +152,7 @@ function layerColorMap(layerPaths) {
   return map;
 }
 
-function mergeByColor(layerPaths, colorMap) {
+export function mergeByColor(layerPaths, colorMap) {
   const byColor = new Map();
   for (const p of layerPaths) {
     const d = p.markup.match(/ d="([^"]*)"/)?.[1];

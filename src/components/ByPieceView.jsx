@@ -5,11 +5,12 @@ import { useMemo, useState } from 'react';
 import { GROUPS } from '../lib/layers.js';
 import { buildTiles } from '../lib/pieceTiles.js';
 import { findTemplate } from '../lib/garmentTemplates.js';
+import { buildPieceSvg, pieceZip } from '../lib/pieceExport.js';
 import { DownloadIcon } from './icons.jsx';
 
 const SIDE_LABEL = { front: 'Front', back: 'Back' };
 
-export default function ByPieceView({ image, trace, garment, templates, onChangeGarment, onSwapSides, onMoveShape, onDownload }) {
+export default function ByPieceView({ image, trace, garment, templates, onChangeGarment, onSwapSides, onMoveShape }) {
   const model = trace.model;
   const [selected, setSelected] = useState(null);
   const tiles = useMemo(() => (model?.garments.length ? buildTiles(model) : []), [model]);
@@ -18,6 +19,11 @@ export default function ByPieceView({ image, trace, garment, templates, onChange
   const partNames = ['front', 'back', ...(template?.parts ?? []).map((p) => p.label.toLowerCase())];
   const busy = trace.status === 'tracing';
   const shape = selected != null ? model?.shapes[selected] : null;
+
+  const base = `${image.name.replace(/\.[^.]+$/, '') || 'design'}-pieces`;
+  const canDownload = !busy && tiles.length > 0;
+  const downloadSvg = () => save(new Blob([buildPieceSvg(model)], { type: 'image/svg+xml' }), `${base}.svg`);
+  const downloadZip = () => save(pieceZip(model, base), `${base}.zip`);
 
   const pick = (e) => {
     const el = e.target.closest?.('[data-i]');
@@ -62,7 +68,7 @@ export default function ByPieceView({ image, trace, garment, templates, onChange
               </dd>
             </div>
             <div className="info-row"><dt>Pieces</dt><dd>{capitalize(partNames.join(', '))}</dd></div>
-            <div className="info-row"><dt>Export</dt><dd>Layered SVG</dd></div>
+            <div className="info-row"><dt>Export</dt><dd>Layered SVG + ZIP</dd></div>
           </dl>
           <p className="notice">Piece outlines are placeholders until Terra Printing's own pattern files are added.</p>
         </section>
@@ -73,10 +79,15 @@ export default function ByPieceView({ image, trace, garment, templates, onChange
               <h2 id="tiles-label">Generated layers by piece</h2>
               <p className="pieces-sub">Separate editable layers, each one cut to the {template?.label.toLowerCase() ?? 'garment'} template</p>
             </div>
-            <button type="button" className="btn btn-primary" onClick={onDownload} disabled={!trace.svg || busy}>
-              <DownloadIcon width={18} height={18} />
-              Download layered SVG
-            </button>
+            <div className="pieces-actions">
+              <button type="button" className="btn btn-primary" onClick={downloadSvg} disabled={!canDownload}>
+                <DownloadIcon width={18} height={18} />
+                Download layered SVG
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={downloadZip} disabled={!canDownload}>
+                ZIP, one file per layer
+              </button>
+            </div>
           </div>
 
           {shape && (
@@ -130,3 +141,12 @@ function selectedStyle(selected, indexes) {
 }
 
 const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function save(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

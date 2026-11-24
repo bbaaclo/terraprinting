@@ -116,7 +116,6 @@ export default function ResultScreen({ image, trace, removeBg, bgMethod, onMoveS
           onChangeGarment={onChangeGarment}
           onSwapSides={onSwapSides}
           onMoveShape={onMoveShape}
-          onDownload={download}
         />
       ) : (
       <main className="studio">
