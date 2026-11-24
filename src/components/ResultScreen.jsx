@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import LayersPanel from './LayersPanel.jsx';
+import ByPieceView from './ByPieceView.jsx';
 import { buildLayeredSvg } from '../lib/layers.js';
 import AppHeader from './AppHeader.jsx';
 import { DownloadIcon, ImageIcon } from './icons.jsx';
@@ -26,11 +27,15 @@ const BACKGROUND_LABELS = {
   off: 'Included',
 };
 
-export default function ResultScreen({ image, trace, removeBg, bgMethod, onMoveShape, onToggleRemoveBg, onChangeBgMethod, onFile, onRetry }) {
+export default function ResultScreen({ image, trace, removeBg, bgMethod, onMoveShape, onToggleRemoveBg, onChangeBgMethod, onFile, onRetry, garment, templates, onChangeGarment, onSwapSides }) {
   const inputRef = useRef(null);
   const stats = useMemo(() => (trace.svg ? svgStats(trace.svg) : null), [trace.svg]);
   const [hidden, setHidden] = useState(() => new Set());
   const [selected, setSelected] = useState(null);
+  // 'whole': the design as one layered SVG. 'pieces': layers per garment side.
+  const [view, setView] = useState('whole');
+  const canSplit = (trace.model?.garments.length ?? 0) > 0;
+  const showPieces = view === 'pieces' && (canSplit || trace.status === 'tracing');
   const layers = trace.layers;
   const markup = useMemo(() => {
     if (!trace.svg) return null;
@@ -72,6 +77,15 @@ export default function ResultScreen({ image, trace, removeBg, bgMethod, onMoveS
   return (
     <>
       <AppHeader>
+        {(canSplit || view === 'pieces') && (
+          <div className="segmented view-switch" role="radiogroup" aria-label="View">
+            {[{ value: 'whole', label: 'Whole design' }, { value: 'pieces', label: 'By piece' }].map((opt) => (
+              <button key={opt.value} type="button" role="radio" aria-checked={(opt.value === 'pieces') === showPieces} className="segment" onClick={() => setView(opt.value)}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
         <span className="file-chip" title={image.name}>
           <ImageIcon width={16} height={16} />
           <span className="file-chip-name">{image.name}</span>
@@ -83,15 +97,28 @@ export default function ResultScreen({ image, trace, removeBg, bgMethod, onMoveS
           ref={inputRef}
           type="file"
           accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+          multiple
           hidden
           onChange={(e) => {
-            const file = e.target.files?.[0];
+            const files = [...(e.target.files ?? [])];
             e.target.value = '';
-            if (file) onFile(file);
+            if (files.length) onFile(files.slice(0, 2));
           }}
         />
       </AppHeader>
 
+      {showPieces ? (
+        <ByPieceView
+          image={image}
+          trace={trace}
+          garment={garment}
+          templates={templates}
+          onChangeGarment={onChangeGarment}
+          onSwapSides={onSwapSides}
+          onMoveShape={onMoveShape}
+          onDownload={download}
+        />
+      ) : (
       <main className="studio">
         <div className="compare">
           <section className="panel view" aria-labelledby="original-label">
@@ -195,6 +222,7 @@ export default function ResultScreen({ image, trace, removeBg, bgMethod, onMoveS
           </div>
         </aside>
       </main>
+      )}
     </>
   );
 }

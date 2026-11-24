@@ -102,7 +102,7 @@ export default function Home() {
   const lastOrderCustomer = lastOrder && data.customers.find((c) => c.id === lastOrder.customerId);
 
   const cardStats = {
-    '#/svg': '5 layers · runs in your browser',
+    '#/svg': '6 layers · front, back and pieces · runs in your browser',
     '#/sizes': `${data.customers.length} customers · ${data.orders.length} team orders`,
     '#/projects': `${ongoing} ongoing · ${pending} pending · ${dueWeek} due this week`,
   };

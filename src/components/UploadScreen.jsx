@@ -23,8 +23,8 @@ export default function UploadScreen({ onFile, error, busy }) {
   const handleDrop = (event) => {
     event.preventDefault();
     setDragging(false);
-    const file = event.dataTransfer.files?.[0];
-    if (file) onFile(file);
+    const files = [...(event.dataTransfer.files ?? [])];
+    if (files.length) onFile(files.slice(0, 2));
   };
 
   return (
@@ -67,7 +67,7 @@ export default function UploadScreen({ onFile, error, busy }) {
             <p className="dropzone-title">
               {busy ? 'Opening image…' : dragging ? 'Drop to trace it' : 'Drag an image here, or click to choose'}
             </p>
-            <p className="dropzone-formats">PNG, JPG or WebP</p>
+            <p className="dropzone-formats">PNG, JPG or WebP · one image, or two for front and back</p>
             <button
               type="button"
               className="btn btn-primary btn-lg"
@@ -81,11 +81,12 @@ export default function UploadScreen({ onFile, error, busy }) {
               ref={inputRef}
               type="file"
               accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+              multiple
               hidden
               onChange={(e) => {
-                const file = e.target.files?.[0];
+                const files = [...(e.target.files ?? [])];
                 e.target.value = '';
-                if (file) onFile(file);
+                if (files.length) onFile(files.slice(0, 2));
               }}
             />
           </div>

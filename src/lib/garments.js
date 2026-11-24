@@ -4,6 +4,8 @@
 // the image, so a design with the front and back side by side gives two big
 // silhouette shapes. Their boxes are the garments.
 
+import { flattenPath } from './cutting.js';
+
 const MIN_GARMENT_SHARE = 0.04; // a garment covers at least 4% of the image
 
 // silhouettePaths: shapes from readPaths() of the silhouette SVG.
@@ -49,7 +51,9 @@ export function isTrim(shape, garment) {
   const h = b.y1 - b.y0;
   if (!(w > 0 && h > 0)) return false;
   if (shape.area > gw * gh * 0.04) return false;
-  const thin = Math.max(w, h) / Math.min(w, h) >= 2;
+  // Thin: long and narrow, or (for a diagonal band, whose box is nearly
+  // square) filling well under half of its box.
+  const thin = Math.max(w, h) / Math.min(w, h) >= 2 || fillShare(shape) < 0.4;
   const cx = (b.x0 + b.x1) / 2 - garment.x0;
   const cy = (b.y0 + b.y1) / 2 - garment.y0;
   const collar = cx > gw * 0.3 && cx < gw * 0.7 && b.y0 - garment.y0 < gh * 0.12 && cy < gh * 0.18;
@@ -112,4 +116,17 @@ function mergeOverlapping(boxes) {
     }
   }
   return out;
+}
+
+// Share of its box that a shape really covers (holes subtract).
+function fillShare(shape) {
+  const d = shape.markup?.match(/ d="([^"]*)"/)?.[1];
+  const rings = d ? flattenPath(d) : null;
+  const boxArea = (shape.box.x1 - shape.box.x0) * (shape.box.y1 - shape.box.y0);
+  if (!rings?.length || !(boxArea > 0)) return 1;
+  let signed = 0;
+  for (const r of rings) {
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) signed += ((r[j][0] + r[i][0]) * (r[j][1] - r[i][1])) / 2;
+  }
+  return Math.abs(signed) / boxArea;
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import UploadScreen from './components/UploadScreen.jsx';
 import ResultScreen from './components/ResultScreen.jsx';
-import { ACCEPTED_TYPES, decodeImage, detectType } from './lib/decodeImage.js';
+import { ACCEPTED_TYPES, decodeImage, decodeSideBySide, detectType } from './lib/decodeImage.js';
 import { traceImage } from './lib/tracer.js';
 import { finalizeSvg } from './lib/svgOutput.js';
 import { DEFAULT_ADJUST, DEFAULT_TRACE_SETTINGS, buildTraceSettings } from './lib/traceSettings.js';
@@ -11,13 +11,14 @@ import { setLastDesign } from './lib/lastDesign.js';
 import { svgFileName } from './lib/svgOutput.js';
 import { findWords } from './lib/ocr.js';
 import { buildLayeredSvg, classify, readPaths } from './lib/layers.js';
-import { applyTemplate, createModel, moveShapeToLayer, placePieces, toLayers } from './lib/pieces.js';
+import { applyTemplate, createModel, moveShapeToLayer, placePieces, setGarmentSide, toLayers } from './lib/pieces.js';
 import { findTemplate } from './lib/garmentTemplates.js';
 import { getData } from './lib/store.js';
 
-// Garment type used to cut the design into pieces. A picker comes with the
-// By piece view; until then every garment is cut as a jersey.
+// Garment type used to cut the design into pieces (picked on the By piece view).
 const DEFAULT_GARMENT = 'jersey';
+
+const templates = () => getData().garmentTemplates;
 
 const AI_FALLBACK_NOTES = {
   'no-webgpu': 'Smart removal needs WebGPU, which this browser does not offer. Plain-color removal was used instead.',
@@ -41,6 +42,9 @@ export default function DesignToSvg() {
   // Trace settings are fixed (the sliders were removed); see traceSettings.js.
   const adjust = DEFAULT_ADJUST;
   const [uploadError, setUploadError] = useState(null);
+  const [garment, setGarment] = useState(DEFAULT_GARMENT);
+  const garmentRef = useRef(garment);
+  garmentRef.current = garment;
   const [opening, setOpening] = useState(false);
   const traceRun = useRef(0);
 
@@ -101,7 +105,7 @@ export default function DesignToSvg() {
         : null;
       const { data, assign, garments } = classify(readPaths(flat), silhouette, words, colorCounts);
       const placed = placePieces(createModel(data, assign, img.width, img.height), garments);
-      const model = applyTemplate(placed, findTemplate(getData().garmentTemplates, DEFAULT_GARMENT));
+      const model = applyTemplate(placed, findTemplate(templates(), garmentRef.current));
       const layers = toLayers(model);
       setTrace({
         ...EMPTY_TRACE,
@@ -130,36 +134,68 @@ export default function DesignToSvg() {
     if (image && removeBg) runTrace(image, removeBg, method, adjust);
   };
 
-  // Moves one shape to another layer group (from the Layers panel).
-  const moveShape = (index, group) => {
+  // Every change to the model goes through here, so layers and the
+  // download always match it.
+  const changeModel = (edit) => {
     setTrace((t) => {
       if (!t.model) return t;
-      const model = moveShapeToLayer(t.model, index, group);
+      const model = edit(t.model);
       if (model === t.model) return t;
       const layers = toLayers(model);
       return { ...t, model, layers, svg: buildLayeredSvg(layers.data, layers.assign, image.width, image.height) };
     });
   };
 
-  const handleFile = useCallback(async (file) => {
-    const type = detectType(file);
-    if (!type) {
-      setUploadError(`“${file.name}” is not a PNG, JPG or WebP image. Choose one of those formats.`);
+  // Moves one shape to another layer group (from the Layers panel or a tile).
+  const moveShape = (index, group) => changeModel((m) => moveShapeToLayer(m, index, group));
+
+  // Re-cuts the garments with another template (jersey, T-shirt, singlet).
+  const changeGarment = (key) => {
+    setGarment(key);
+    changeModel((m) => applyTemplate(m, findTemplate(templates(), key)));
+  };
+
+  // Staff correcting front and back: every garment switches side.
+  const swapSides = () => changeModel((m) => m.garments.reduce(
+    (acc, g, i) => setGarmentSide(acc, i, g.side === 'back' ? 'front' : 'back'), m,
+  ));
+
+  // One image, or two (front and back) that are joined side by side.
+  const handleFile = useCallback(async (input) => {
+    const files = (Array.isArray(input) ? input : [input]).slice(0, 2);
+    const bad = files.find((f) => !detectType(f));
+    if (bad) {
+      setUploadError(`“${bad.name}” is not a PNG, JPG or WebP image. Choose one of those formats.`);
       setImage(null);
       return;
     }
     setUploadError(null);
     setOpening(true);
     try {
-      const pixels = await decodeImage(file);
-      const next = {
-        name: file.name,
-        format: ACCEPTED_TYPES[type],
-        url: URL.createObjectURL(file),
-        width: pixels.width,
-        height: pixels.height,
-        pixels,
-      };
+      let next;
+      if (files.length === 2) {
+        const { pixels, blob } = await decodeSideBySide(files);
+        const base = files[0].name.replace(/\.[^.]+$/, '');
+        next = {
+          name: `${base}-front-back.png`,
+          format: `${ACCEPTED_TYPES[detectType(files[0])]} + ${ACCEPTED_TYPES[detectType(files[1])]}`,
+          url: URL.createObjectURL(blob),
+          width: pixels.width,
+          height: pixels.height,
+          pixels,
+        };
+      } else {
+        const file = files[0];
+        const pixels = await decodeImage(file);
+        next = {
+          name: file.name,
+          format: ACCEPTED_TYPES[detectType(file)],
+          url: URL.createObjectURL(file),
+          width: pixels.width,
+          height: pixels.height,
+          pixels,
+        };
+      }
       setImage(next);
       runTrace(next, removeBg, bgMethod, adjust);
     } catch (err) {
@@ -186,6 +222,10 @@ export default function DesignToSvg() {
       removeBg={removeBg}
       bgMethod={bgMethod}
       onMoveShape={moveShape}
+      garment={garment}
+      templates={templates()}
+      onChangeGarment={changeGarment}
+      onSwapSides={swapSides}
       onToggleRemoveBg={toggleRemoveBg}
       onChangeBgMethod={changeBgMethod}
       onFile={handleFile}
