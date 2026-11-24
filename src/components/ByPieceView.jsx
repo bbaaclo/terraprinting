@@ -9,6 +9,10 @@ import { buildPieceSvg, pieceZip } from '../lib/pieceExport.js';
 import { DownloadIcon } from './icons.jsx';
 
 const SIDE_LABEL = { front: 'Front', back: 'Back' };
+const BUSY_TEXT = {
+  'loading-regions': 'Loading the recognition model. The first time downloads about 223 MB…',
+  regions: 'Finding the team name, number and logo…',
+};
 
 export default function ByPieceView({ image, trace, garment, templates, onChangeGarment, onSwapSides, onMoveShape }) {
   const model = trace.model;
@@ -118,7 +122,8 @@ export default function ByPieceView({ image, trace, garment, templates, onChange
             </div>
           )}
 
-          {busy && <p className="stage-message">Tracing the design and cutting it into pieces…</p>}
+          {busy && <p className="stage-message">{BUSY_TEXT[trace.phase] ?? 'Tracing the design and cutting it into pieces…'}</p>}
+          {!busy && trace.note && <p className="notice" role="status">{trace.note}</p>}
           {trace.status === 'error' && <p className="notice" role="alert">{trace.error}</p>}
           {!busy && trace.status === 'done' && !tiles.length && (
             <p className="notice">No garment was found in this image, so it cannot be split into pieces. Use Whole design instead.</p>

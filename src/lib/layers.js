@@ -21,6 +21,7 @@ export const GROUPS = [
 
 const MIN_NUMBER_CONFIDENCE = 55;
 const MIN_WORD_CONFIDENCE = 70;
+const MAX_LOGO_SHARE = 0.25; // a logo box covers at most a quarter of its garment
 
 // Reads every <path> with its fill and bounding box (measured by the browser).
 export function readPaths(svgMarkup) {
@@ -50,7 +51,7 @@ export function readPaths(svgMarkup) {
 // in the main color. Returns { data, assign, garments } where dropped shapes
 // (big base pieces and fabric shading, now covered by Jersey Base) are removed and
 // garments are the boxes of the garments found (see garments.js).
-export function classify(traced, silhouette, words, colorCounts) {
+export function classify(traced, silhouette, words, colorCounts, logoBoxes = []) {
   const { viewWidth, viewHeight } = traced;
   const canvasArea = viewWidth * viewHeight;
   const paths = traced.paths;
@@ -66,6 +67,17 @@ export function classify(traced, silhouette, words, colorCounts) {
   for (const w of numbers) assignInside(paths, assign, pad(w.bbox, 0.15), 'number');
   for (const w of alpha) assignInside(paths, assign, pad(w.bbox, 0.15), 'name');
 
+  // --- Logos found by smart recognition: everything inside the box ---
+  // A box covering a large part of the garment is not a logo (the model
+  // pointed at the whole shirt), so it is ignored.
+  const garments = findGarments(silhouette?.paths ?? [], viewWidth, viewHeight);
+  for (const box of logoBoxes) {
+    const g = garments[garmentOf(box, garments)];
+    const area = (box.x1 - box.x0) * (box.y1 - box.y0);
+    const room = g ? (g.x1 - g.x0) * (g.y1 - g.y0) : canvasArea;
+    if (area > 0 && area <= room * MAX_LOGO_SHARE) assignInside(paths, assign, pad(box, 0.05), 'logo');
+  }
+
   // --- Colors ---
   const totalPx = Object.values(colorCounts).reduce((a, b) => a + b, 0) || 1;
   const colors = Object.entries(colorCounts).map(([hex, n]) => ({ hex, share: n / totalPx, rgb: hexToRgb(hex) }));
@@ -74,7 +86,6 @@ export function classify(traced, silhouette, words, colorCounts) {
 
   // Collar and sleeve bands. Checked before Logo, because band colors
   // are often rare accent tones that would otherwise read as a logo.
-  const garments = findGarments(silhouette?.paths ?? [], viewWidth, viewHeight);
   paths.forEach((p, i) => {
     if (assign[i] || !main || p.fill === main.hex) return;
     const kind = trimKind(p, garments[garmentOf(p.box, garments)]);

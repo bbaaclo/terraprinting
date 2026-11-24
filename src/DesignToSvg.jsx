@@ -10,6 +10,7 @@ import { upscaleIfSmall } from './lib/upscale.js';
 import { setLastDesign } from './lib/lastDesign.js';
 import { svgFileName } from './lib/svgOutput.js';
 import { findWords } from './lib/ocr.js';
+import { getAiRegions, mergeRegions } from './lib/aiRegions.js';
 import { buildLayeredSvg, classify, readPaths } from './lib/layers.js';
 import { applyTemplate, createModel, layersFromParts, moveShapeToLayer, paletteFrom, placePieces, setGarmentSide, toLayers } from './lib/pieces.js';
 import { findTemplate } from './lib/garmentTemplates.js';
@@ -28,6 +29,15 @@ const AI_FALLBACK_NOTES = {
 
 // model: the shared design model (lib/pieces.js). layers is derived from it
 // for the screens that still read { data, assign }.
+// When smart recognition cannot run, the basic text reader still finds
+// plain names and numbers; logos and stylized lettering may stay in Main
+// Pattern, where staff can move them.
+const REGION_FALLBACK_NOTES = {
+  'no-webgpu': 'Smart recognition needs WebGPU (Chrome on a computer). Names and numbers were found with the basic reader; logos may be in Main Pattern.',
+  'no-f16': 'This graphics card cannot run smart recognition. Names and numbers were found with the basic reader; logos may be in Main Pattern.',
+  'no-model': 'The recognition model could not be downloaded (it needs internet the first time, about 223 MB). The basic reader was used instead.',
+};
+
 const EMPTY_TRACE = { status: 'idle', phase: null, svg: null, error: null, background: null, note: null, model: null, layers: null };
 
 // Words found per image and background setting, so switching the
@@ -100,10 +110,26 @@ export default function DesignToSvg() {
         console.error('Text recognition failed:', err);
       }
       if (!current()) return;
+
+      // Smart recognition: where the team name, number and logo are.
+      let logoBoxes = [];
+      const aiKey = `ai-${wordKey}`;
+      try {
+        if (!perImage.has(aiKey)) {
+          perImage.set(aiKey, getAiRegions(work, (phase) => { if (current()) setTrace((t) => ({ ...t, phase })); }));
+        }
+        const merged = mergeRegions(words, await perImage.get(aiKey));
+        words = merged.words;
+        logoBoxes = merged.logos;
+      } catch (err) {
+        perImage.delete(aiKey);
+        note = [note, REGION_FALLBACK_NOTES[err.code] ?? `Smart recognition did not finish (${err.message}). The basic reader was used instead.`].filter(Boolean).join(' ');
+      }
+      if (!current()) return;
       const silhouette = silhouetteSvg
         ? readPaths(finalizeSvg(silhouetteSvg, img.width, img.height, palette, work.width, work.height))
         : null;
-      const { data, assign, garments } = classify(readPaths(flat), silhouette, words, colorCounts);
+      const { data, assign, garments } = classify(readPaths(flat), silhouette, words, colorCounts, logoBoxes);
       const placed = placePieces(createModel(data, assign, img.width, img.height), garments);
       const model = layersFromParts(applyTemplate(
         { ...placed, palette: paletteFrom(colorCounts) },

@@ -10,7 +10,7 @@
 // If the download fails (no internet), the app still runs: smart removal
 // falls back to plain-color removal and says so.
 import { createHash } from 'node:crypto';
-import { copyFileSync, createReadStream, createWriteStream, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -42,6 +42,22 @@ for (const f of ['tesseract-core-lstm.wasm.js', 'tesseract-core-simd-lstm.wasm.j
 }
 const langDir = dirname(require.resolve('@tesseract.js-data/eng/package.json'));
 copyFileSync(join(langDir, '4.0.0_best_int', 'eng.traineddata.gz'), join(ocrOut, 'lang', 'eng.traineddata.gz'));
+
+// 1c. Smart recognition (Florence-2 through Transformers.js) runs on its own
+// copy of the ONNX Runtime; its engine files are served by this app instead
+// of a public CDN. The model itself is fetched by the browser on first use.
+// The runtime version must be the one Transformers.js was built with: npm
+// keeps it inside the package when it differs from the app's own copy.
+const tjsDir = join(root, 'node_modules', '@huggingface', 'transformers');
+const tjsWant = JSON.parse(readFileSync(join(tjsDir, 'package.json'), 'utf8')).dependencies['onnxruntime-web'];
+const tjsOrt = [join(tjsDir, 'node_modules', 'onnxruntime-web'), join(root, 'node_modules', 'onnxruntime-web')]
+  .find((dir) => existsSync(join(dir, 'package.json')) && JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).version === tjsWant);
+if (!tjsOrt) throw new Error(`prepare-ai: onnxruntime-web ${tjsWant} for Transformers.js is missing. Run npm install again.`);
+const tjsOut = join(root, 'public', 'ort-tjs');
+mkdirSync(tjsOut, { recursive: true });
+for (const f of ['ort-wasm-simd-threaded.asyncify.mjs', 'ort-wasm-simd-threaded.asyncify.wasm']) {
+  copyFileSync(join(tjsOrt, 'dist', f), join(tjsOut, f));
+}
 
 // 2. Model
 const modelDir = join(root, 'public', 'models');

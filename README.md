@@ -24,6 +24,22 @@ pinned to a fixed version and checked by SHA-256) into `public/models/`. Needs C
 with WebGPU. If the model or WebGPU is missing, the app uses plain-color
 removal instead and says why.
 
+## Smart recognition (team name, number, logo)
+
+Design to SVG asks Microsoft's Florence-2 model (MIT license, through
+Transformers.js) where the text and the logo are, so stylized team names and
+logos get their own layers. It runs on the computer's graphics card (Chrome
+with WebGPU and 16-bit shader support). The image never leaves the computer.
+
+The first time, the browser downloads the model from Hugging Face (about
+223 MB, pinned to one exact version in `src/lib/regions.worker.js`) and keeps
+it in its cache. Without WebGPU or internet on that first run, the app uses
+the basic text reader instead and says why; logos may then stay in Main
+Pattern, where staff can move them.
+
+`npm install` copies the model runtime's engine files into `public/ort-tjs/`
+so they are served by the app, not a public CDN.
+
 ## Company logo
 
 The header shows the Terra Printing logo from `public/brand-logo.png`.
