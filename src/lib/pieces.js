@@ -35,6 +35,7 @@ export function createModel(data, assign, width, height) {
     viewHeight: data.viewHeight,
     garment: null,     // garment template key, set when a template is chosen
     garments: [],      // [{ box, side }] found by placePieces()
+    palette: [],       // [{ hex, share, role }] from paletteFrom()
     pieces: [WHOLE],
     shapes: data.paths.map((p, i) => ({
       markup: p.markup,
@@ -133,4 +134,34 @@ export function applyTemplate(model, template) {
     }
   }
   return { ...model, garment: template.key, uncut: source, shapes };
+}
+
+// Graphics that the template places on a sleeve or the collar belong to
+// Sleeve Details or Collar rather than the Main Pattern. Only shapes still
+// in Main Pattern move; the jersey base and text, logo and number layers
+// stay as they are. Run after applyTemplate().
+export function layersFromParts(model) {
+  let changed = false;
+  const shapes = model.shapes.map((s) => {
+    if (s.layer !== 'pattern') return s;
+    const layer = s.part === 'collar' ? 'collar' : s.part?.startsWith('sleeve') ? 'sleeve' : null;
+    if (!layer) return s;
+    changed = true;
+    return { ...s, layer };
+  });
+  return changed ? { ...model, shapes } : model;
+}
+
+// The design's colors, from the pixel count of every color in the traced
+// image (so it is the real palette, never made up). Colors under 0.5% of
+// the design are left out; at most 8 are listed, largest first.
+export function paletteFrom(colorCounts) {
+  const entries = Object.entries(colorCounts ?? {});
+  const total = entries.reduce((a, [, n]) => a + n, 0) || 1;
+  return entries
+    .map(([hex, n]) => ({ hex: hex.toUpperCase(), share: n / total }))
+    .filter((c) => c.share >= 0.005)
+    .sort((a, b) => b.share - a.share)
+    .slice(0, 8)
+    .map((c, i) => ({ ...c, role: i === 0 ? 'Primary' : i === 1 ? 'Secondary' : 'Accent' }));
 }

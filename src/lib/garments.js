@@ -42,15 +42,16 @@ export function garmentOf(box, garments) {
 // Collar and sleeve bands: small shapes in an accent color sitting in the
 // collar area (top middle) or at the sleeve ends (outer top corners) of a
 // garment. Thin bands only, so logos and numbers are never caught.
-export function isTrim(shape, garment) {
-  if (!garment) return false;
+// Returns 'collar', 'sleeve' or null.
+export function trimKind(shape, garment) {
+  if (!garment) return null;
   const gw = garment.x1 - garment.x0;
   const gh = garment.y1 - garment.y0;
   const b = shape.box;
   const w = b.x1 - b.x0;
   const h = b.y1 - b.y0;
-  if (!(w > 0 && h > 0)) return false;
-  if (shape.area > gw * gh * 0.04) return false;
+  if (!(w > 0 && h > 0)) return null;
+  if (shape.area > gw * gh * 0.04) return null;
   // Thin: long and narrow, or (for a diagonal band, whose box is nearly
   // square) filling well under half of its box.
   const thin = Math.max(w, h) / Math.min(w, h) >= 2 || fillShare(shape) < 0.4;
@@ -58,7 +59,9 @@ export function isTrim(shape, garment) {
   const cy = (b.y0 + b.y1) / 2 - garment.y0;
   const collar = cx > gw * 0.3 && cx < gw * 0.7 && b.y0 - garment.y0 < gh * 0.12 && cy < gh * 0.18;
   const sleeve = (cx < gw * 0.22 || cx > gw * 0.78) && cy < gh * 0.45;
-  return thin && (collar || sleeve);
+  if (!thin) return null;
+  if (collar) return 'collar';
+  return sleeve ? 'sleeve' : null;
 }
 
 // Front or back per garment.

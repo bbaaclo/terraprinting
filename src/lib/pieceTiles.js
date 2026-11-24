@@ -1,30 +1,29 @@
-// The tiles of the By piece view: one per layer and side (Front or Back)
-// that has shapes, in layer order. Each tile is a small SVG cropped to that
-// side's garment, with the garment's pieces drawn as dashed outlines so staff
-// can see where the layer sits.
+// The tiles of the By piece view: one per layer for the chosen side (Front
+// or Back), always in the same order. A layer with no shapes still gets a
+// tile, marked empty, so staff can see what was not found and fix it by
+// moving shapes. Each tile is a small SVG cropped to that side's garment,
+// with the garment's pieces drawn as dashed outlines.
 import { GROUPS } from './layers.js';
 
 const PAD = 0.05; // space around the garment in a tile, as a share of its size
 
-export function buildTiles(model) {
-  const sides = ['front', 'back'].filter((side) => model.garments.some((g) => g.side === side));
-  const tiles = [];
-  for (const g of GROUPS) {
-    for (const side of sides) {
-      const indexes = [];
-      model.shapes.forEach((s, i) => { if (s.layer === g.key && s.piece === side) indexes.push(i); });
-      if (!indexes.length) continue;
-      tiles.push({
-        key: `${side}-${g.key}`,
-        layer: g.key,
-        label: g.label,
-        side,
-        indexes,
-        svg: tileSvg(model, side, g.key, indexes),
-      });
-    }
-  }
-  return tiles.map((t, n) => ({ ...t, title: `Layer ${n + 1}: ${t.label}` }));
+export function availableSides(model) {
+  return ['front', 'back'].filter((side) => model.garments.some((g) => g.side === side));
+}
+
+export function buildTiles(model, side) {
+  return GROUPS.map((g) => {
+    const indexes = [];
+    model.shapes.forEach((s, i) => { if (s.layer === g.key && s.piece === side) indexes.push(i); });
+    return {
+      key: `${side}-${g.key}`,
+      layer: g.key,
+      title: g.label,
+      side,
+      indexes,
+      svg: indexes.length ? tileSvg(model, side, g.key, indexes) : null,
+    };
+  });
 }
 
 function tileSvg(model, side, layer, indexes) {
@@ -32,11 +31,11 @@ function tileSvg(model, side, layer, indexes) {
   const w = box.x1 - box.x0;
   const h = box.y1 - box.y0;
   const vb = [box.x0 - w * PAD, box.y0 - h * PAD, w * (1 + 2 * PAD), h * (1 + 2 * PAD)].map((n) => round(n)).join(' ');
-  // Dashed outlines: the garment's base color pieces (front body, sleeves,
-  // collar). Not drawn on the Color tile itself, where they are the content.
-  const outline = layer === 'color' ? [] : model.shapes
+  // Dashed outlines: the garment's base pieces (body, sleeves, collar).
+  // Not drawn on the Jersey Base tile itself, where they are the content.
+  const outline = layer === 'base' ? [] : model.shapes
     .map((s, i) => [s, i])
-    .filter(([s]) => s.layer === 'color' && s.piece === side)
+    .filter(([s]) => s.layer === 'base' && s.piece === side)
     .map(([s]) => s.markup.replace(/<path/, '<path class="tile-outline"').replace(/ fill="[^"]*"/, ' fill="none"'));
   const shapes = indexes.map((i) => {
     const s = model.shapes[i];

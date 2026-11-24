@@ -1,18 +1,20 @@
-import { findGarments, garmentOf, isTrim } from './garments.js';
+import { findGarments, garmentOf, trimKind } from './garments.js';
 
-// Sorts the traced design into the six layers staff work with:
-// Color, Pattern, Trim, Logo, Name, Number. Trim is the collar and sleeve
-// bands. Simple rules plus the words found by
+// Sorts the traced design into the layers staff work with: Jersey Base,
+// Main Pattern, Accent Elements, Sleeve Details, Collar, Logo, Team Name and
+// Number. (The color palette is shown beside them; it is not a layer.) Simple rules plus the words found by
 // text recognition; staff can move a shape to another layer by hand.
 //
 // Bottom-to-top order in the SVG. Each layer keeps the shapes' original
 // order, and whole words/logos move together (letters with their holes).
 export const GROUPS = [
-  { key: 'color', label: 'Color' },
-  { key: 'pattern', label: 'Pattern' },
-  { key: 'trim', label: 'Trim' },
+  { key: 'base', label: 'Jersey Base' },
+  { key: 'pattern', label: 'Main Pattern' },
+  { key: 'accent', label: 'Accent Elements' },
+  { key: 'sleeve', label: 'Sleeve Details' },
+  { key: 'collar', label: 'Collar' },
   { key: 'logo', label: 'Logo' },
-  { key: 'name', label: 'Name' },
+  { key: 'name', label: 'Team Name' },
   { key: 'number', label: 'Number' },
 ];
 
@@ -45,7 +47,7 @@ export function readPaths(svgMarkup) {
 
 // traced: shapes from the full trace. silhouette: the smooth outline shapes
 // in the main color. Returns { data, assign, garments } where dropped shapes
-// (big base pieces and fabric shading, now covered by Color) are removed and
+// (big base pieces and fabric shading, now covered by Jersey Base) are removed and
 // garments are the boxes of the garments found (see garments.js).
 export function classify(traced, silhouette, words, colorCounts) {
   const { viewWidth, viewHeight } = traced;
@@ -69,12 +71,13 @@ export function classify(traced, silhouette, words, colorCounts) {
   colors.sort((a, b) => b.share - a.share);
   const main = colors[0];
 
-  // Trim: collar and sleeve bands. Checked before Logo, because band colors
+  // Collar and sleeve bands. Checked before Logo, because band colors
   // are often rare accent tones that would otherwise read as a logo.
   const garments = findGarments(silhouette?.paths ?? [], viewWidth, viewHeight);
   paths.forEach((p, i) => {
     if (assign[i] || !main || p.fill === main.hex) return;
-    if (isTrim(p, garments[garmentOf(p.box, garments)])) assign[i] = 'trim';
+    const kind = trimKind(p, garments[garmentOf(p.box, garments)]);
+    if (kind) assign[i] = kind;
   });
 
   // Logo: shapes in a rare, clearly colored tone, plus everything inside them.
@@ -95,14 +98,14 @@ export function classify(traced, silhouette, words, colorCounts) {
   paths.forEach((p, i) => {
     if (assign[i]) return;
     const big = p.area >= canvasArea * 0.03;
-    if (main && p.fill === main.hex && big) drop[i] = true;            // replaced by the Color layer
+    if (main && p.fill === main.hex && big) drop[i] = true;            // replaced by the Jersey Base layer
     else if (shadingTones.has(p.fill) && p.area >= canvasArea * 0.003) drop[i] = true; // fold or shadow
     else assign[i] = 'pattern';
   });
 
   const keptPaths = [];
   const keptAssign = [];
-  for (const p of silhouette?.paths ?? []) { keptPaths.push(p); keptAssign.push('color'); }
+  for (const p of silhouette?.paths ?? []) { keptPaths.push(p); keptAssign.push('base'); }
   paths.forEach((p, i) => { if (!drop[i]) { keptPaths.push(p); keptAssign.push(assign[i]); } });
   return { data: { paths: keptPaths, viewWidth, viewHeight }, assign: keptAssign, garments };
 }
@@ -128,7 +131,9 @@ export function buildLayeredSvg({ paths, viewWidth, viewHeight }, assign, width,
         .replace(/fill="#[0-9A-Fa-f]{6}"/, `fill="${colorMap.get(p.fill)}"`))
       : mergeByColor(inLayer.map(([p]) => p), colorMap);
     if (!members.length) continue;
-    parts.push(`<g id="${g.label}" inkscape:groupmode="layer" inkscape:label="${g.label}">\n${members.join('\n')}\n</g>`);
+    // ids cannot hold spaces: "Jersey Base" becomes Jersey_Base. The
+    // readable name stays in inkscape:label.
+    parts.push(`<g id="${g.label.replace(/ /g, '_')}" inkscape:groupmode="layer" inkscape:label="${g.label}">\n${members.join('\n')}\n</g>`);
   }
   return `${forPreview ? '' : '<?xml version="1.0" encoding="UTF-8"?>\n'}<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" version="1.1" width="${width}" height="${height}" viewBox="0 0 ${viewWidth} ${viewHeight}">\n${parts.join('\n')}\n</svg>`;
 }
@@ -168,7 +173,7 @@ export function mergeByColor(layerPaths, colorMap) {
   return [...byColor].map(([fill, ds]) => `<path d="${ds.join(' ')}" fill="${fill}" fill-rule="evenodd"/>`);
 }
 
-// All six layers, always listed, even when empty. The count is the number
+// All layers, always listed, even when empty. The count is the number
 // of shapes in the downloaded file (one per color in the layer).
 export function groupSummary(paths, assign) {
   return GROUPS.map((g) => {

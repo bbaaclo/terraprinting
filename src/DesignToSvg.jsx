@@ -11,7 +11,7 @@ import { setLastDesign } from './lib/lastDesign.js';
 import { svgFileName } from './lib/svgOutput.js';
 import { findWords } from './lib/ocr.js';
 import { buildLayeredSvg, classify, readPaths } from './lib/layers.js';
-import { applyTemplate, createModel, moveShapeToLayer, placePieces, setGarmentSide, toLayers } from './lib/pieces.js';
+import { applyTemplate, createModel, layersFromParts, moveShapeToLayer, paletteFrom, placePieces, setGarmentSide, toLayers } from './lib/pieces.js';
 import { findTemplate } from './lib/garmentTemplates.js';
 import { getData } from './lib/store.js';
 
@@ -105,7 +105,10 @@ export default function DesignToSvg() {
         : null;
       const { data, assign, garments } = classify(readPaths(flat), silhouette, words, colorCounts);
       const placed = placePieces(createModel(data, assign, img.width, img.height), garments);
-      const model = applyTemplate(placed, findTemplate(templates(), garmentRef.current));
+      const model = layersFromParts(applyTemplate(
+        { ...placed, palette: paletteFrom(colorCounts) },
+        findTemplate(templates(), garmentRef.current),
+      ));
       const layers = toLayers(model);
       setTrace({
         ...EMPTY_TRACE,
@@ -152,7 +155,7 @@ export default function DesignToSvg() {
   // Re-cuts the garments with another template (jersey, T-shirt, singlet).
   const changeGarment = (key) => {
     setGarment(key);
-    changeModel((m) => applyTemplate(m, findTemplate(templates(), key)));
+    changeModel((m) => layersFromParts(applyTemplate(m, findTemplate(templates(), key))));
   };
 
   // Staff correcting front and back: every garment switches side.
