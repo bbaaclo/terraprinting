@@ -50,6 +50,11 @@ export function getAiRegions(pixels, onPhase) {
     getWorker().postMessage({ id, rgba: copy, width: pixels.width, height: pixels.height }, [copy.buffer]);
   });
   cache.set(pixels, promise);
+  // What the model found, for checking results in the browser console (F12).
+  promise.then((r) => console.info('Smart recognition found:', {
+    text: r.words.map((w) => `${w.text} @ ${boxText(w.bbox)}`),
+    logos: r.logos.map((l) => boxText(l.bbox)),
+  }), () => {});
   promise.catch((err) => {
     cache.delete(pixels);
     console.error('Smart recognition failed:', err.message);
@@ -57,6 +62,8 @@ export function getAiRegions(pixels, onPhase) {
   });
   return promise;
 }
+
+const boxText = (b) => `${Math.round(b.x0)},${Math.round(b.y0)} to ${Math.round(b.x1)},${Math.round(b.y1)}`;
 
 // Turns the model's answer into what classify() reads: words (merged with
 // the basic text reader's words, keeping each word once) and logo boxes.

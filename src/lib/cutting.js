@@ -48,6 +48,7 @@ export function cutShape(shape, parts) {
       markup: `<path d="${geomToD(p.geom)}" fill="${shape.fill}" fill-rule="evenodd"/>`,
       box,
       area: (box.x1 - box.x0) * (box.y1 - box.y0),
+      ink: p.area, // the real filled area of this piece
     };
   });
 }
@@ -191,4 +192,49 @@ export function insideRing([px, py], ring) {
     if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
   }
   return inside;
+}
+
+// Shapes that run across the edge of a found region (a number, a team name,
+// a logo) are cut at the region's box, so the part inside can join that
+// layer and the rest stays where it was. This happens when lettering touches
+// a pattern of the same color: the tracer joins them into one shape.
+// Only shapes in the region's own color are cut (the color that fills most
+// of the box, e.g. the number's yellow), and only when at least half of
+// their ink lies inside, so a stripe of another color, or one merely
+// passing behind the text, stays whole.
+// skip(shape): shapes never to cut (the jersey's base color).
+const MIN_BOX_SHARE = 0.25;   // quick check on the boxes first
+const MIN_INK_SHARE = 0.5;    // then: at least half of the real ink inside
+
+export function splitAtBoxes(paths, boxes, skip = () => false) {
+  let out = paths;
+  for (const box of boxes) {
+    const ring = [[box.x0, box.y0], [box.x1, box.y0], [box.x1, box.y1], [box.x0, box.y1]];
+    const inkByColor = new Map();
+    const add = (fill, n) => inkByColor.set(fill, (inkByColor.get(fill) ?? 0) + n);
+    const cuts = new Map(); // shape -> { pieces, share }
+    for (const p of out) {
+      if (skip(p)) continue;
+      const b = p.box;
+      const fullyInside = b.x0 >= box.x0 && b.y0 >= box.y0 && b.x1 <= box.x1 && b.y1 <= box.y1;
+      if (fullyInside) { add(p.fill, p.area); continue; }
+      const ix = Math.min(b.x1, box.x1) - Math.max(b.x0, box.x0);
+      const iy = Math.min(b.y1, box.y1) - Math.max(b.y0, box.y0);
+      if (ix <= 0 || iy <= 0 || (ix * iy) / ((b.x1 - b.x0) * (b.y1 - b.y0)) < MIN_BOX_SHARE) continue;
+      const pieces = cutShape(p, [{ key: 'in', ring }]);
+      const total = pieces.reduce((a, q) => a + (q.ink ?? 0), 0);
+      const inside = pieces.filter((q) => q.part === 'in').reduce((a, q) => a + (q.ink ?? 0), 0);
+      if (pieces.length < 2 || !(total > 0)) continue;
+      cuts.set(p, { pieces, share: inside / total });
+      add(p.fill, inside);
+    }
+    const ink = [...inkByColor].sort((a, b) => b[1] - a[1])[0]?.[0];
+    if (!ink || !cuts.size) continue;
+    out = out.flatMap((p) => {
+      const c = cuts.get(p);
+      if (!c || p.fill !== ink || c.share < MIN_INK_SHARE) return [p];
+      return c.pieces.map((q) => ({ ...p, markup: q.markup, box: q.box, area: q.area }));
+    });
+  }
+  return out;
 }

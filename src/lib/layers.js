@@ -1,5 +1,6 @@
 import { findGarments, garmentOf, trimKind } from './garments.js';
 import { findAccents } from './accents.js';
+import { splitAtBoxes } from './cutting.js';
 
 // Sorts the traced design into the layers staff work with: Jersey Base,
 // Main Pattern, Accent Elements, Sleeve Details, Collar, Logo, Team Name and
@@ -54,35 +55,39 @@ export function readPaths(svgMarkup) {
 export function classify(traced, silhouette, words, colorCounts, logoBoxes = []) {
   const { viewWidth, viewHeight } = traced;
   const canvasArea = viewWidth * viewHeight;
-  const paths = traced.paths;
-  const assign = new Array(paths.length).fill(null);
+  // --- Colors ---
+  const totalPx = Object.values(colorCounts).reduce((a, b) => a + b, 0) || 1;
+  const colors = Object.entries(colorCounts).map(([hex, n]) => ({ hex, share: n / totalPx, rgb: hexToRgb(hex) }));
+  colors.sort((a, b) => b.share - a.share);
+  const main = colors[0];
+  const garments = findGarments(silhouette?.paths ?? [], viewWidth, viewHeight);
 
-  // --- Words: numbers, and every other word goes to Name ---
+  // --- Regions: numbers, team name and other words, logos ---
   const minHeight = viewHeight * 0.012;
   const clean = words
     .map((w) => ({ ...w, text: (w.text || '').replace(/[^A-Za-z0-9]/g, '') }))
     .filter((w) => w.text.length >= 1 && w.bbox.y1 - w.bbox.y0 >= minHeight);
   const numbers = clean.filter((w) => /^\d{1,3}$/.test(w.text) && w.confidence >= MIN_NUMBER_CONFIDENCE);
   const alpha = clean.filter((w) => /[A-Za-z]{3,}/.test(w.text) && w.confidence >= MIN_WORD_CONFIDENCE);
-  for (const w of numbers) assignInside(paths, assign, pad(w.bbox, 0.15), 'number');
-  for (const w of alpha) assignInside(paths, assign, pad(w.bbox, 0.15), 'name');
-
-  // --- Logos found by smart recognition: everything inside the box ---
   // A box covering a large part of the garment is not a logo (the model
   // pointed at the whole shirt), so it is ignored.
-  const garments = findGarments(silhouette?.paths ?? [], viewWidth, viewHeight);
-  for (const box of logoBoxes) {
+  const logos = logoBoxes.filter((box) => {
     const g = garments[garmentOf(box, garments)];
     const area = (box.x1 - box.x0) * (box.y1 - box.y0);
     const room = g ? (g.x1 - g.x0) * (g.y1 - g.y0) : canvasArea;
-    if (area > 0 && area <= room * MAX_LOGO_SHARE) assignInside(paths, assign, pad(box, 0.05), 'logo');
-  }
+    return area > 0 && area <= room * MAX_LOGO_SHARE;
+  });
+  const regions = [
+    ...numbers.map((w) => ({ box: pad(w.bbox, 0.15), layer: 'number' })),
+    ...alpha.map((w) => ({ box: pad(w.bbox, 0.15), layer: 'name' })),
+    ...logos.map((box) => ({ box: pad(box, 0.05), layer: 'logo' })),
+  ];
 
-  // --- Colors ---
-  const totalPx = Object.values(colorCounts).reduce((a, b) => a + b, 0) || 1;
-  const colors = Object.entries(colorCounts).map(([hex, n]) => ({ hex, share: n / totalPx, rgb: hexToRgb(hex) }));
-  colors.sort((a, b) => b.share - a.share);
-  const main = colors[0];
+  // Lettering that touches a same-colored pattern was traced as one shape
+  // with it; cut such shapes at each region's box (never the base color).
+  const paths = splitAtBoxes(traced.paths, regions.map((r) => r.box), (p) => main && p.fill === main.hex);
+  const assign = new Array(paths.length).fill(null);
+  for (const r of regions) assignInside(paths, assign, r.box, r.layer);
 
   // Collar and sleeve bands. Checked before Logo, because band colors
   // are often rare accent tones that would otherwise read as a logo.

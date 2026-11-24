@@ -66,22 +66,20 @@ export function trimKind(shape, garment) {
 
 // Front or back per garment.
 // Two or more garments: the back is the one with the tallest number (back
-// numbers are printed bigger); with no numbers, the one with the most name
-// lettering; otherwise the second garment. One garment: front, because a
-// single image is usually the front view; staff can change it.
+// numbers are printed bigger). Without a clear number, the left garment is
+// the front and the next one the back, as in most mockups. (Name lettering
+// is not used: fronts carry team names and sponsor text too.) One garment:
+// front, because a single image is usually the front view. Staff can swap.
 export function sideOfGarments(garmentCount, shapes, shapeGarment) {
   if (garmentCount === 0) return [];
   if (garmentCount === 1) return ['front'];
   const tallestNumber = new Array(garmentCount).fill(0);
-  const nameArea = new Array(garmentCount).fill(0);
   shapes.forEach((s, i) => {
     const g = shapeGarment[i];
     if (g < 0) return;
     if (s.layer === 'number') tallestNumber[g] = Math.max(tallestNumber[g], s.box.y1 - s.box.y0);
-    if (s.layer === 'name') nameArea[g] += s.area;
   });
   let back = argmax(tallestNumber);
-  if (back < 0) back = argmax(nameArea);
   if (back < 0) back = 1;
   return Array.from({ length: garmentCount }, (_, i) => (i === back ? 'back' : 'front'));
 }
