@@ -14,7 +14,7 @@ function getWorker() {
     worker.onmessage = ({ data }) => {
       const job = pending.get(data.id);
       if (!job) return;
-      if (data.phase) { job.onPhase?.(data.phase); return; }
+      if (data.phase) { job.onPhase?.(data.phase, data.progress); return; }
       pending.delete(data.id);
       if (data.error) {
         const err = new Error(data.error);
@@ -36,9 +36,19 @@ function getWorker() {
   return worker;
 }
 
+// Starts downloading and preparing the AI model in the background, so it is
+// ready (or nearly) by the time an image is uploaded. Only once per page load.
+let warmed = false;
+export function warmUpAi() {
+  if (warmed || !('gpu' in navigator)) return;
+  warmed = true;
+  getWorker().postMessage({ type: 'warm' });
+}
+
 function resetWorker() {
   if (worker) worker.terminate();
   worker = null;
+  warmed = false;
 }
 
 // Runs the model; after a crash it starts a fresh worker (a crashed

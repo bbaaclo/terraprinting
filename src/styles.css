@@ -374,17 +374,6 @@ strong { font-weight: 600; }
 .move-box { margin-top: 12px; padding: 12px; border-radius: var(--radius-md); background: var(--orange-wash); }
 .move-box label { display: block; font-size: 13px; line-height: 1.4; color: #7a3b0c; }
 .move-row { display: flex; gap: 8px; margin-top: 8px; }
-.move-row select {
-  flex: 1;
-  min-width: 0;
-  min-height: 44px;
-  padding: 0 10px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  font: inherit;
-  font-size: 14px;
-}
 .svg-preview.is-pickable path { cursor: pointer; }
 
 /* Remove background switch */
@@ -1049,3 +1038,8 @@ a.btn { text-decoration: none; }
 .gen-size { margin-top: 8px; font-size: 20px; font-weight: 800; }
 .gen-note { margin-top: 16px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--orange-wash); color: #7a3b0c; font-size: 13px; line-height: 1.45; }
 .gen-empty { margin-top: 18px; padding: 28px; border: 2px dashed var(--line-strong); border-radius: var(--radius-md); text-align: center; color: var(--muted); font-size: 14px; }
+
+/* AI model download progress */
+.load-bar { display: block; width: min(280px, 70%); height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.load-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--orange), var(--amber)); transition: width 200ms ease; }
+.stage-message .link-btn { font-size: 13px; }

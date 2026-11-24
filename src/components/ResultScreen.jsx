@@ -12,7 +12,8 @@ function formatBytes(bytes) {
 }
 
 const PHASE_TEXT = {
-  loading: 'Loading the AI model. The first time takes a little longer…',
+  loading: 'Loading the AI model…',
+  starting: 'Preparing the AI model on your graphics card…',
   layers: 'Finding names, numbers and logos…',
   detecting: 'Finding the design…',
   tracing: 'Tracing the design…',
@@ -112,7 +113,21 @@ export default function ResultScreen({ image, trace, removeBg, bgMethod, onMoveS
             <div className="stage">
               {trace.status === 'tracing' && <span className="progress" aria-hidden="true" />}
               {markup && <div className={`svg-preview${layers ? ' is-pickable' : ''}`} role="img" aria-label="Traced SVG" onClick={pickShape} dangerouslySetInnerHTML={markup} />}
-              {trace.status === 'tracing' && <p className="stage-message">{PHASE_TEXT[trace.phase] ?? PHASE_TEXT.tracing}</p>}
+              {trace.status === 'tracing' && (
+                <div className="stage-message">
+                  <p>
+                    {trace.phase === 'loading' && trace.progress != null
+                      ? `Downloading the AI model, one time only: ${trace.progress}% of 100 MB`
+                      : PHASE_TEXT[trace.phase] ?? PHASE_TEXT.tracing}
+                  </p>
+                  {trace.phase === 'loading' && trace.progress != null && (
+                    <span className="load-bar" aria-hidden="true"><span style={{ width: `${trace.progress}%` }} /></span>
+                  )}
+                  {['loading', 'starting', 'detecting'].includes(trace.phase) && bgMethod === 'ai' && (
+                    <button type="button" className="link-btn" onClick={() => onChangeBgMethod('color')}>Use Plain color instead</button>
+                  )}
+                </div>
+              )}
               {trace.status === 'error' && (
                 <div className="stage-message" role="alert">
                   <p>{trace.error}</p>

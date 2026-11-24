@@ -5,7 +5,7 @@ import { ACCEPTED_TYPES, decodeImage, detectType } from './lib/decodeImage.js';
 import { traceImage } from './lib/tracer.js';
 import { finalizeSvg } from './lib/svgOutput.js';
 import { DEFAULT_ADJUST, DEFAULT_TRACE_SETTINGS, buildTraceSettings } from './lib/traceSettings.js';
-import { applyMask, getAiMask } from './lib/aiBackground.js';
+import { applyMask, getAiMask, warmUpAi } from './lib/aiBackground.js';
 import { upscaleIfSmall } from './lib/upscale.js';
 import { setLastDesign } from './lib/lastDesign.js';
 import { svgFileName } from './lib/svgOutput.js';
@@ -48,8 +48,8 @@ export default function DesignToSvg() {
 
       if (useAi) {
         try {
-          const mask = await getAiMask(img.pixels, (phase) => {
-            if (current()) setTrace((t) => ({ ...t, phase }));
+          const mask = await getAiMask(img.pixels, (phase, progress) => {
+            if (current()) setTrace((t) => ({ ...t, phase, progress }));
           });
           const result = applyMask(img.pixels, mask);
           if (result.usable) {
@@ -155,6 +155,9 @@ export default function DesignToSvg() {
       setOpening(false);
     }
   }, [runTrace, removeBg, bgMethod, adjust]);
+
+  // Start fetching the AI model as soon as this page opens.
+  useEffect(() => { if (removeBg && bgMethod === 'ai') warmUpAi(); }, [removeBg, bgMethod]);
 
   // Remember the latest layered SVG so the Size chart can use it as a pattern.
   useEffect(() => { if (trace.svg && image) setLastDesign({ name: svgFileName(image.name), svg: trace.svg }); }, [trace.svg, image]);

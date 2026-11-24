@@ -15,31 +15,68 @@ ort.env.wasm.wasmPaths = { wasm: '/ort/ort-wasm-simd-threaded.asyncify.wasm' };
 ort.env.wasm.numThreads = 1;
 ort.env.logLevel = 'error';
 
-let session = null;
+const MODEL_BYTES = 104329641; // expected size, for progress when the server does not say
+const CACHE_NAME = 'terra-ai-model-v1';
 
-async function getSession(report) {
-  if (session) return session;
-  if (!('gpu' in navigator) || !(await navigator.gpu.requestAdapter())) {
-    throw codeError('no-webgpu', 'This browser has no WebGPU support.');
-  }
-  report('loading');
+let sessionPromise = null;
+const listeners = new Set(); // progress callbacks of everyone waiting for the model
+const broadcast = (phase, progress) => listeners.forEach((l) => l(phase, progress));
+
+// Gets the model bytes: from the browser's cache after the first visit,
+// otherwise downloaded once with progress, then saved to the cache.
+async function loadModelBytes() {
+  let cache = null;
+  try {
+    cache = await caches.open(CACHE_NAME);
+    const hit = await cache.match(MODEL_URL);
+    if (hit) return new Uint8Array(await hit.arrayBuffer());
+  } catch { /* no Cache Storage here: just download */ }
+
   const res = await fetch(MODEL_URL);
   const type = res.headers.get('content-type') || '';
-  if (!res.ok || type.includes('text/html')) {
+  if (!res.ok || type.includes('text/html') || !res.body) {
     throw codeError('no-model', 'The AI model file is missing.');
   }
-  const bytes = new Uint8Array(await res.arrayBuffer());
-  try {
-    // 'basic' skips the aggressive graph fusions, which use much more
-    // memory on a graph this large.
-    session = await ort.InferenceSession.create(bytes, {
-      executionProviders: ['webgpu'],
-      graphOptimizationLevel: 'basic',
-    });
-  } catch (err) {
-    throw codeError('failed', `while loading the model: ${err?.message ?? err}`);
+  const total = Number(res.headers.get('content-length')) || MODEL_BYTES;
+  const reader = res.body.getReader();
+  const chunks = [];
+  let received = 0;
+  let shown = -1;
+  broadcast('loading', 0);
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    const pct = Math.min(99, Math.floor((received / total) * 100));
+    if (pct !== shown) { shown = pct; broadcast('loading', pct); }
   }
-  return session;
+  const bytes = new Uint8Array(received);
+  let at = 0;
+  for (const c of chunks) { bytes.set(c, at); at += c.length; }
+  try { await cache?.put(MODEL_URL, new Response(bytes, { headers: { 'content-type': 'application/octet-stream' } })); } catch { /* storage full: fine */ }
+  return bytes;
+}
+
+function getSession(report) {
+  listeners.add(report);
+  if (!sessionPromise) {
+    sessionPromise = (async () => {
+      if (!('gpu' in navigator) || !(await navigator.gpu.requestAdapter())) {
+        throw codeError('no-webgpu', 'This browser has no WebGPU support.');
+      }
+      const bytes = await loadModelBytes();
+      broadcast('starting');
+      try {
+        // 'basic' skips the aggressive graph fusions, which use much more
+        // memory on a graph this large.
+        return await ort.InferenceSession.create(bytes, { executionProviders: ['webgpu'], graphOptimizationLevel: 'basic' });
+      } catch (err) {
+        throw codeError('failed', `while loading the model: ${err?.message ?? err}`);
+      }
+    })().catch((err) => { sessionPromise = null; throw err; });
+  }
+  return sessionPromise.finally(() => listeners.delete(report));
 }
 
 function codeError(code, message) {
@@ -49,8 +86,13 @@ function codeError(code, message) {
 }
 
 self.onmessage = async (event) => {
+  // Warm-up: start downloading and preparing the model before any image.
+  if (event.data.type === 'warm') {
+    getSession(() => {}).catch(() => { /* errors show when an image is traced */ });
+    return;
+  }
   const { id, rgba, width, height } = event.data;
-  const report = (phase) => self.postMessage({ id, phase });
+  const report = (phase, progress) => self.postMessage({ id, phase, progress });
   try {
     const s = await getSession(report);
     report('detecting');

@@ -1,4 +1,5 @@
 import { GROUPS, groupSummary } from '../lib/layers.js';
+import { Select } from '../pages/PageShell.jsx';
 
 const EyeIcon = ({ off }) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -45,9 +46,9 @@ export default function LayersPanel({ layers, hidden, onToggle, selected, onClea
         <div className="move-box">
           <label htmlFor="move-to">Selected shape is in {GROUPS.find((g) => g.key === selectedGroup)?.label}. Move it to:</label>
           <div className="move-row">
-            <select id="move-to" value={selectedGroup ?? ''} onChange={(e) => onMove(selected, e.target.value)}>
+            <Select id="move-to" className="grow" value={selectedGroup ?? ''} onChange={(e) => onMove(selected, e.target.value)}>
               {GROUPS.map((g) => <option key={g.key} value={g.key}>{g.label}</option>)}
-            </select>
+            </Select>
             <button type="button" className="btn btn-secondary" onClick={onClearSelection}>Done</button>
           </div>
         </div>
