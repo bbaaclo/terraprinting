@@ -1,4 +1,5 @@
 import { findGarments, garmentOf, trimKind } from './garments.js';
+import { findAccents } from './accents.js';
 
 // Sorts the traced design into the layers staff work with: Jersey Base,
 // Main Pattern, Accent Elements, Sleeve Details, Collar, Logo, Team Name and
@@ -93,6 +94,16 @@ export function classify(traced, silhouette, words, colorCounts) {
   const shadingTones = new Set(
     colors.filter((c) => main && c !== main && chroma(c.rgb) < 35 && Math.sqrt(dist2(c.rgb, main.rgb)) < 90).map((c) => c.hex),
   );
+
+  // Accent Elements: groups of many small shapes (halftone dots, speckles).
+  // Shading tones are left out: small fold marks are not decoration.
+  const accentCandidates = paths.map((p, i) => i)
+    .filter((i) => !assign[i] && (!main || paths[i].fill !== main.hex) && !shadingTones.has(paths[i].fill));
+  const garmentArea = (i) => {
+    const g = garments[garmentOf(paths[i].box, garments)];
+    return g ? (g.x1 - g.x0) * (g.y1 - g.y0) : canvasArea;
+  };
+  for (const i of findAccents(paths, accentCandidates, garmentArea)) assign[i] = 'accent';
 
   const drop = new Array(paths.length).fill(false);
   paths.forEach((p, i) => {

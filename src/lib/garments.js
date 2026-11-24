@@ -122,7 +122,7 @@ function mergeOverlapping(boxes) {
 }
 
 // Share of its box that a shape really covers (holes subtract).
-function fillShare(shape) {
+export function fillShare(shape) {
   const d = shape.markup?.match(/ d="([^"]*)"/)?.[1];
   const rings = d ? flattenPath(d) : null;
   const boxArea = (shape.box.x1 - shape.box.x0) * (shape.box.y1 - shape.box.y0);
