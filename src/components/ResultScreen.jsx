@@ -15,7 +15,7 @@ function formatBytes(bytes) {
 const PHASE_TEXT = {
   loading: 'Loading the AI model. The first time takes a little longer…',
   layers: 'Finding names, numbers and logos…',
-  'loading-regions': 'Loading the recognition model. The first time downloads about 223 MB…',
+  'loading-regions': 'Loading the recognition model. The first time downloads about 231 MB…',
   regions: 'Finding the team name, number and logo…',
   detecting: 'Finding the design…',
   tracing: 'Tracing the design…',

@@ -32,7 +32,7 @@ logos get their own layers. It runs on the computer's graphics card (Chrome
 with WebGPU and 16-bit shader support). The image never leaves the computer.
 
 The first time, the browser downloads the model from Hugging Face (about
-223 MB, pinned to one exact version in `src/lib/regions.worker.js`) and keeps
+231 MB, pinned to one exact version in `src/lib/regions.worker.js`) and keeps
 it in its cache. Without WebGPU or internet on that first run, the app uses
 the basic text reader instead and says why; logos may then stay in Main
 Pattern, where staff can move them.

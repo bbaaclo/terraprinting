@@ -35,7 +35,8 @@ const AI_FALLBACK_NOTES = {
 const REGION_FALLBACK_NOTES = {
   'no-webgpu': 'Smart recognition needs WebGPU (Chrome on a computer). Names and numbers were found with the basic reader; logos may be in Main Pattern.',
   'no-f16': 'This graphics card cannot run smart recognition. Names and numbers were found with the basic reader; logos may be in Main Pattern.',
-  'no-model': 'The recognition model could not be downloaded (it needs internet the first time, about 223 MB). The basic reader was used instead.',
+  'no-model': 'The recognition model could not be downloaded (it needs internet the first time, about 231 MB). The basic reader was used instead.',
+  'bad-model': 'The recognition model downloaded but could not start in this browser. The basic reader was used instead. The browser console (F12) has the details.',
 };
 
 const EMPTY_TRACE = { status: 'idle', phase: null, svg: null, error: null, background: null, note: null, model: null, layers: null };

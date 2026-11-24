@@ -13,9 +13,17 @@ import { AutoProcessor, Florence2ForConditionalGeneration, RawImage, env } from 
 
 const MODEL_ID = 'onnx-community/Florence-2-base-ft';
 const REVISION = 'e88a44eaf3791a35eae0c5a47b3dbcd36e67eb6f'; // pinned: the files can never change under us
-// 4-bit weights with 16-bit math, about 223 MB in all. Needs a GPU that
-// supports 16-bit shaders (almost every desktop GPU in Chrome does).
-const DTYPE = { embed_tokens: 'q4f16', vision_encoder: 'q4f16', encoder_model: 'q4f16', decoder_model_merged: 'q4f16' };
+// 4-bit weights, about 231 MB in all. Needs a GPU that supports 16-bit
+// shaders (almost every desktop GPU in Chrome does).
+// The text decoder is loaded as plain 4-bit (q4), not q4f16: the 16-bit
+// conversion of that one file leaves an output wired straight through its
+// branches, which current ONNX Runtime rejects as an invalid model ("Subgraph
+// output (logits) is an outer scope value"). The other three files have no
+// branches, so their smaller 16-bit versions load fine.
+const DTYPE = { embed_tokens: 'q4f16', vision_encoder: 'q4f16', encoder_model: 'q4f16', decoder_model_merged: 'q4' };
+// If a decoder still will not load, try once more with the 8-bit decoder
+// (98 MB instead of 64 MB; the other files are already in the cache).
+const DTYPE_RETRY = { ...DTYPE, decoder_model_merged: 'quantized' };
 const LOGO_PHRASE = 'a team logo';
 
 env.allowLocalModels = false;
@@ -40,15 +48,27 @@ async function load(report) {
   if (!adapter) throw codeError('no-webgpu', 'No graphics card is available to WebGPU.');
   if (!adapter.features.has('shader-f16')) throw codeError('no-f16', 'This graphics card cannot run the 16-bit model.');
   report('loading-regions');
+  let processor;
   try {
-    const [model, processor] = await Promise.all([
-      Florence2ForConditionalGeneration.from_pretrained(MODEL_ID, { revision: REVISION, dtype: DTYPE, device: 'webgpu' }),
-      AutoProcessor.from_pretrained(MODEL_ID, { revision: REVISION }),
-    ]);
-    return { model, processor };
+    processor = await AutoProcessor.from_pretrained(MODEL_ID, { revision: REVISION });
   } catch (err) {
-    throw codeError('no-model', `The recognition model could not be loaded (${err?.message ?? err}).`);
+    throw codeError('no-model', `The recognition model could not be downloaded (${err?.message ?? err}).`);
   }
+  let lastError = null;
+  for (const dtype of [DTYPE, DTYPE_RETRY]) {
+    try {
+      const model = await Florence2ForConditionalGeneration.from_pretrained(MODEL_ID, { revision: REVISION, dtype, device: 'webgpu' });
+      return { model, processor };
+    } catch (err) {
+      lastError = err;
+      console.warn(`Smart recognition: the ${dtype.decoder_model_merged} decoder did not load:`, err?.message ?? err);
+    }
+  }
+  const message = String(lastError?.message ?? lastError);
+  // A download problem and a model that downloaded but will not start in
+  // this browser need different advice, so they get different codes.
+  const code = /fetch|network|404|Could not locate|Failed to load/i.test(message) && !/session|invalid model/i.test(message) ? 'no-model' : 'bad-model';
+  throw codeError(code, `The recognition model could not be started (${message}).`);
 }
 
 async function ask({ model, processor }, image, task, input = '') {
