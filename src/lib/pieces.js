@@ -20,6 +20,8 @@ export const PIECES = [
 ];
 
 import { garmentOf, sideOfGarments } from './garments.js';
+import { placeTemplate } from './garmentTemplates.js';
+import { cutShape } from './cutting.js';
 
 export const WHOLE = 'whole';
 
@@ -41,6 +43,7 @@ export function createModel(data, assign, width, height) {
       area: p.area,
       layer: assign[i] ?? null,
       piece: WHOLE,
+      part: null,      // 'body', 'collar', 'sleeve-left'... once a template is applied
     })),
   };
 }
@@ -106,4 +109,28 @@ export function setGarmentSide(model, garmentIndex, side) {
   const boxes = model.garments.map((x) => x.box);
   const shapes = model.shapes.map((s) => (garmentOf(s.box, boxes) === garmentIndex ? { ...s, piece: side } : s));
   return { ...model, garments, shapes, pieces: [...new Set(shapes.map((s) => s.piece))] };
+}
+
+// Cuts every garment along a piece template (see garmentTemplates.js and
+// cutting.js). Shapes inside one part keep their traced outline; shapes
+// crossing a seam are split, one shape per part, each keeping its layer.
+// Choosing another template later re-cuts from the shapes before any cut,
+// so cuts never pile up. Layer moves made after a cut are kept only for
+// shapes that were not split.
+export function applyTemplate(model, template) {
+  const source = model.uncut ?? model.shapes;
+  if (!template || !model.garments.length) {
+    return { ...model, garment: template?.key ?? null, uncut: null, shapes: source };
+  }
+  const boxes = model.garments.map((g) => g.box);
+  const placed = boxes.map((box) => placeTemplate(template, box));
+  const shapes = [];
+  for (const s of source) {
+    const g = garmentOf(s.box, boxes);
+    if (g < 0) { shapes.push({ ...s, part: null }); continue; }
+    for (const piece of cutShape(s, placed[g])) {
+      shapes.push({ ...s, markup: piece.markup, box: piece.box, area: piece.area, part: piece.part });
+    }
+  }
+  return { ...model, garment: template.key, uncut: source, shapes };
 }

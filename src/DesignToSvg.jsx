@@ -11,7 +11,13 @@ import { setLastDesign } from './lib/lastDesign.js';
 import { svgFileName } from './lib/svgOutput.js';
 import { findWords } from './lib/ocr.js';
 import { buildLayeredSvg, classify, readPaths } from './lib/layers.js';
-import { createModel, moveShapeToLayer, placePieces, toLayers } from './lib/pieces.js';
+import { applyTemplate, createModel, moveShapeToLayer, placePieces, toLayers } from './lib/pieces.js';
+import { findTemplate } from './lib/garmentTemplates.js';
+import { getData } from './lib/store.js';
+
+// Garment type used to cut the design into pieces. A picker comes with the
+// By piece view; until then every garment is cut as a jersey.
+const DEFAULT_GARMENT = 'jersey';
 
 const AI_FALLBACK_NOTES = {
   'no-webgpu': 'Smart removal needs WebGPU, which this browser does not offer. Plain-color removal was used instead.',
@@ -94,7 +100,8 @@ export default function DesignToSvg() {
         ? readPaths(finalizeSvg(silhouetteSvg, img.width, img.height, palette, work.width, work.height))
         : null;
       const { data, assign, garments } = classify(readPaths(flat), silhouette, words, colorCounts);
-      const model = placePieces(createModel(data, assign, img.width, img.height), garments);
+      const placed = placePieces(createModel(data, assign, img.width, img.height), garments);
+      const model = applyTemplate(placed, findTemplate(getData().garmentTemplates, DEFAULT_GARMENT));
       const layers = toLayers(model);
       setTrace({
         ...EMPTY_TRACE,

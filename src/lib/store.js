@@ -3,6 +3,7 @@
 // anywhere. Use Export backup on the Home screen to keep a copy.
 import { useSyncExternalStore } from 'react';
 import { emptyData, sampleData, samplePatternSizes } from './sampleData.js';
+import { DEFAULT_TEMPLATES } from './garmentTemplates.js';
 
 // v2: sample names changed to clearly made-up ones, so every browser
 // (including yours) starts again from the new sample data.
@@ -17,12 +18,23 @@ function load() {
       const saved = JSON.parse(raw);
       // Data saved before the size generator existed gets the default presets.
       if (!saved.patternSizes) saved.patternSizes = samplePatternSizes();
-      return saved;
+      return withTemplates(saved);
     }
   } catch {
     /* fall through to sample data */
   }
-  return sampleData();
+  return withTemplates(sampleData());
+}
+
+// Garment piece templates (sleeves, collar) for Design to SVG. Data saved
+// before templates existed gets the default (placeholder) ones.
+function withTemplates(data) {
+  return data.garmentTemplates ? data : { ...data, garmentTemplates: structuredClone(DEFAULT_TEMPLATES) };
+}
+
+// The current data, for code outside React components.
+export function getData() {
+  return state;
 }
 
 function save() {
@@ -44,13 +56,13 @@ export function update(change) {
 }
 
 export function replaceAll(data) {
-  state = data.patternSizes ? data : { ...data, patternSizes: samplePatternSizes() };
+  state = withTemplates(data.patternSizes ? data : { ...data, patternSizes: samplePatternSizes() });
   save();
   listeners.forEach((l) => l());
 }
 
 // Keeps the size charts (they may have been edited); clears the rest.
-export const removeSampleData = () => replaceAll({ ...emptyData(), charts: state.charts, patternSizes: state.patternSizes });
+export const removeSampleData = () => replaceAll({ ...emptyData(), charts: state.charts, patternSizes: state.patternSizes, garmentTemplates: state.garmentTemplates });
 
 export function useData() {
   return useSyncExternalStore(
