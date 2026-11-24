@@ -11,6 +11,7 @@ import { setLastDesign } from './lib/lastDesign.js';
 import { svgFileName } from './lib/svgOutput.js';
 import { findWords } from './lib/ocr.js';
 import { buildLayeredSvg, classify, readPaths } from './lib/layers.js';
+import { createModel, moveShapeToLayer, toLayers } from './lib/pieces.js';
 
 const AI_FALLBACK_NOTES = {
   'no-webgpu': 'Smart removal needs WebGPU, which this browser does not offer. Plain-color removal was used instead.',
@@ -18,7 +19,9 @@ const AI_FALLBACK_NOTES = {
   unclear: 'The AI could not find a clear design in this image. Plain-color removal was used instead.',
 };
 
-const EMPTY_TRACE = { status: 'idle', phase: null, svg: null, error: null, background: null, note: null, layers: null };
+// model: the shared design model (lib/pieces.js). layers is derived from it
+// for the screens that still read { data, assign }.
+const EMPTY_TRACE = { status: 'idle', phase: null, svg: null, error: null, background: null, note: null, model: null, layers: null };
 
 // Words found per image and background setting, so switching the
 // background options does not run text recognition again.
@@ -91,11 +94,14 @@ export default function DesignToSvg() {
         ? readPaths(finalizeSvg(silhouetteSvg, img.width, img.height, palette, work.width, work.height))
         : null;
       const { data, assign } = classify(readPaths(flat), silhouette, words, colorCounts);
+      const model = createModel(data, assign, img.width, img.height);
+      const layers = toLayers(model);
       setTrace({
         ...EMPTY_TRACE,
         status: 'done',
-        svg: buildLayeredSvg(data, assign, img.width, img.height),
-        layers: { data, assign },
+        svg: buildLayeredSvg(layers.data, layers.assign, img.width, img.height),
+        model,
+        layers,
         background: background ?? traced,
         note,
       });
@@ -120,10 +126,11 @@ export default function DesignToSvg() {
   // Moves one shape to another layer group (from the Layers panel).
   const moveShape = (index, group) => {
     setTrace((t) => {
-      if (!t.layers) return t;
-      const assign = [...t.layers.assign];
-      assign[index] = group;
-      return { ...t, layers: { ...t.layers, assign }, svg: buildLayeredSvg(t.layers.data, assign, image.width, image.height) };
+      if (!t.model) return t;
+      const model = moveShapeToLayer(t.model, index, group);
+      if (model === t.model) return t;
+      const layers = toLayers(model);
+      return { ...t, model, layers, svg: buildLayeredSvg(layers.data, layers.assign, image.width, image.height) };
     });
   };
 
