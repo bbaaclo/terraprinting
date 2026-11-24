@@ -133,10 +133,13 @@ export function buildLayeredSvg({ paths, viewWidth, viewHeight }, assign, width,
   return `${forPreview ? '' : '<?xml version="1.0" encoding="UTF-8"?>\n'}<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" version="1.1" width="${width}" height="${height}" viewBox="0 0 ${viewWidth} ${viewHeight}">\n${parts.join('\n')}\n</svg>`;
 }
 
-// Each layer keeps at most 3 colors: its 3 largest by area. Smaller tones
-// (edge blends, faint bits) take the nearest of those 3, so every layer
-// ends up as 1 to 3 shapes.
+// Each layer keeps at most 3 main colors: its 3 largest by area. Smaller
+// tones that are close to one of those (edge blends, faint bits) take that
+// color, so most layers end up as 1 to 3 shapes. A tone that is clearly
+// different (white lettering left in Pattern, for example) keeps its own
+// color: recoloring it would change the printed design.
 const MAX_COLORS_PER_LAYER = 3;
+const NEAR_COLOR = 60; // RGB distance; closer tones are blends of a main color
 
 export function layerColorMap(layerPaths) {
   const byColor = {};
@@ -147,7 +150,8 @@ export function layerColorMap(layerPaths) {
   for (const hex of ranked) {
     if (keep.includes(hex)) { map.set(hex, hex); continue; }
     const rgb = hexToRgb(hex);
-    map.set(hex, keep.reduce((best, k) => (dist2(hexToRgb(k), rgb) < dist2(hexToRgb(best), rgb) ? k : best), keep[0]));
+    const nearest = keep.reduce((best, k) => (dist2(hexToRgb(k), rgb) < dist2(hexToRgb(best), rgb) ? k : best), keep[0]);
+    map.set(hex, dist2(hexToRgb(nearest), rgb) <= NEAR_COLOR ** 2 ? nearest : hex);
   }
   return map;
 }
@@ -172,7 +176,9 @@ export function groupSummary(paths, assign) {
     const byColor = {};
     for (const p of members) byColor[p.fill] = (byColor[p.fill] || 0) + p.area;
     const ranked = Object.entries(byColor).sort((a, b) => b[1] - a[1]);
-    return { ...g, count: Math.min(ranked.length, MAX_COLORS_PER_LAYER), swatch: ranked[0]?.[0] ?? null };
+    const map = layerColorMap(members);
+    const count = new Set(members.map((p) => map.get(p.fill))).size;
+    return { ...g, count, swatch: ranked[0]?.[0] ?? null };
   });
 }
 
