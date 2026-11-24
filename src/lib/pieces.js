@@ -3,7 +3,7 @@
 // it belongs to (front, back, sleeves, collar).
 //
 // Until a garment template is chosen, every shape sits in one piece,
-// "whole", so the design behaves exactly like the plain five-layer result.
+// "whole", so the design behaves exactly like the plain layered result.
 // Later steps add templates that split shapes into real pieces; auto naming,
 // sizing and export then read pieces from here instead of re-tracing.
 //
@@ -19,6 +19,8 @@ export const PIECES = [
   { key: 'collar', label: 'Collar' },
 ];
 
+import { garmentOf, sideOfGarments } from './garments.js';
+
 export const WHOLE = 'whole';
 
 // data: { paths, viewWidth, viewHeight } and assign: layer key per path,
@@ -29,7 +31,8 @@ export function createModel(data, assign, width, height) {
     height,
     viewWidth: data.viewWidth,
     viewHeight: data.viewHeight,
-    garment: null,
+    garment: null,     // garment template key, set when a template is chosen
+    garments: [],      // [{ box, side }] found by placePieces()
     pieces: [WHOLE],
     shapes: data.paths.map((p, i) => ({
       markup: p.markup,
@@ -75,4 +78,32 @@ export function shapeIndexes(model, { piece = null, layer = null } = {}) {
     out.push(i);
   });
   return out;
+}
+
+// Splits the design into the garments found by classify() and tags each
+// one front or back. Every shape goes to the garment it sits in.
+// With no garments found, the model is returned unchanged ("whole").
+export function placePieces(model, garmentBoxes) {
+  if (!garmentBoxes?.length) return model;
+  const shapeGarment = model.shapes.map((s) => garmentOf(s.box, garmentBoxes));
+  const sides = sideOfGarments(garmentBoxes.length, model.shapes, shapeGarment);
+  // Two garments on the same side (rare: e.g. two fronts) keep "front".
+  const shapes = model.shapes.map((s, i) => ({ ...s, piece: shapeGarment[i] >= 0 ? sides[shapeGarment[i]] : WHOLE }));
+  const pieces = [...new Set(shapes.map((s) => s.piece))];
+  return {
+    ...model,
+    garments: garmentBoxes.map((box, i) => ({ box, side: sides[i] })),
+    pieces,
+    shapes,
+  };
+}
+
+// Changes which side a garment is (staff correcting front/back).
+export function setGarmentSide(model, garmentIndex, side) {
+  const g = model.garments[garmentIndex];
+  if (!g || g.side === side) return model;
+  const garments = model.garments.map((x, i) => (i === garmentIndex ? { ...x, side } : x));
+  const boxes = model.garments.map((x) => x.box);
+  const shapes = model.shapes.map((s) => (garmentOf(s.box, boxes) === garmentIndex ? { ...s, piece: side } : s));
+  return { ...model, garments, shapes, pieces: [...new Set(shapes.map((s) => s.piece))] };
 }

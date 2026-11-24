@@ -1,5 +1,8 @@
-// Sorts the traced design into the five layers staff work with:
-// Color, Pattern, Logo, Name, Number. Simple rules plus the words found by
+import { findGarments, garmentOf, isTrim } from './garments.js';
+
+// Sorts the traced design into the six layers staff work with:
+// Color, Pattern, Trim, Logo, Name, Number. Trim is the collar and sleeve
+// bands. Simple rules plus the words found by
 // text recognition; staff can move a shape to another layer by hand.
 //
 // Bottom-to-top order in the SVG. Each layer keeps the shapes' original
@@ -7,6 +10,7 @@
 export const GROUPS = [
   { key: 'color', label: 'Color' },
   { key: 'pattern', label: 'Pattern' },
+  { key: 'trim', label: 'Trim' },
   { key: 'logo', label: 'Logo' },
   { key: 'name', label: 'Name' },
   { key: 'number', label: 'Number' },
@@ -40,8 +44,9 @@ export function readPaths(svgMarkup) {
 }
 
 // traced: shapes from the full trace. silhouette: the smooth outline shapes
-// in the main color. Returns { data, assign } where dropped shapes
-// (big base pieces and fabric shading, now covered by Color) are removed.
+// in the main color. Returns { data, assign, garments } where dropped shapes
+// (big base pieces and fabric shading, now covered by Color) are removed and
+// garments are the boxes of the garments found (see garments.js).
 export function classify(traced, silhouette, words, colorCounts) {
   const { viewWidth, viewHeight } = traced;
   const canvasArea = viewWidth * viewHeight;
@@ -63,6 +68,14 @@ export function classify(traced, silhouette, words, colorCounts) {
   const colors = Object.entries(colorCounts).map(([hex, n]) => ({ hex, share: n / totalPx, rgb: hexToRgb(hex) }));
   colors.sort((a, b) => b.share - a.share);
   const main = colors[0];
+
+  // Trim: collar and sleeve bands. Checked before Logo, because band colors
+  // are often rare accent tones that would otherwise read as a logo.
+  const garments = findGarments(silhouette?.paths ?? [], viewWidth, viewHeight);
+  paths.forEach((p, i) => {
+    if (assign[i] || !main || p.fill === main.hex) return;
+    if (isTrim(p, garments[garmentOf(p.box, garments)])) assign[i] = 'trim';
+  });
 
   // Logo: shapes in a rare, clearly colored tone, plus everything inside them.
   const rare = new Set(colors.filter((c) => c.share < 0.025 && chroma(c.rgb) > 60).map((c) => c.hex));
@@ -91,7 +104,7 @@ export function classify(traced, silhouette, words, colorCounts) {
   const keptAssign = [];
   for (const p of silhouette?.paths ?? []) { keptPaths.push(p); keptAssign.push('color'); }
   paths.forEach((p, i) => { if (!drop[i]) { keptPaths.push(p); keptAssign.push(assign[i]); } });
-  return { data: { paths: keptPaths, viewWidth, viewHeight }, assign: keptAssign };
+  return { data: { paths: keptPaths, viewWidth, viewHeight }, assign: keptAssign, garments };
 }
 
 // Builds the SVG with one named group per layer. Inkscape reads the
@@ -151,7 +164,7 @@ function mergeByColor(layerPaths, colorMap) {
   return [...byColor].map(([fill, ds]) => `<path d="${ds.join(' ')}" fill="${fill}" fill-rule="evenodd"/>`);
 }
 
-// All five layers, always listed, even when empty. The count is the number
+// All six layers, always listed, even when empty. The count is the number
 // of shapes in the downloaded file (one per color in the layer).
 export function groupSummary(paths, assign) {
   return GROUPS.map((g) => {
